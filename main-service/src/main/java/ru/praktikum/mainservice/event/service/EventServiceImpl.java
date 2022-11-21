@@ -1,0 +1,643 @@
+package ru.praktikum.mainservice.event.service;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import ru.praktikum.mainservice.category.model.Category;
+import ru.praktikum.mainservice.category.repository.CategoryStorage;
+import ru.praktikum.mainservice.event.enums.StateEnum;
+import ru.praktikum.mainservice.event.mapper.EventMapper;
+import ru.praktikum.mainservice.event.model.Event;
+import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
+import ru.praktikum.mainservice.event.model.dto.EventFullDto;
+import ru.praktikum.mainservice.event.model.dto.EventShortDto;
+import ru.praktikum.mainservice.event.model.dto.NewEventDto;
+import ru.praktikum.mainservice.event.repository.EventStorage;
+import ru.praktikum.mainservice.exception.BadRequestException;
+import ru.praktikum.mainservice.exception.NotFoundException;
+import ru.praktikum.mainservice.request.mapper.RequestMapper;
+import ru.praktikum.mainservice.request.model.Request;
+import ru.praktikum.mainservice.request.model.dto.ParticipationRequestDto;
+import ru.praktikum.mainservice.request.model.dto.UpdateEventRequest;
+import ru.praktikum.mainservice.request.repository.RequestStorage;
+import ru.praktikum.mainservice.user.model.User;
+import ru.praktikum.mainservice.user.repository.UserStorage;
+
+import javax.persistence.EntityManager;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class EventServiceImpl implements EventService {
+
+    private final EventStorage eventStorage;
+    private final UserStorage userStorage;
+    private final CategoryStorage categoryStorage;
+    private final RequestStorage requestStorage;
+
+    private EntityManager entityManager;
+
+    /*
+    POST EVENT - Добавление нового события:
+        Обратите внимание:
+            дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
+    */
+    @Override
+    public EventFullDto createEvent(long userId, NewEventDto newEventDto) {
+        /*
+        Из контроллера приходит только id пользователя,
+        а положить в Event нужно всего пользователя, дополнительно проверяем наличие пользователя в БД;
+        */
+        User initiator = checkUserAvailableInDb(userId);
+
+        /*
+        В NewEventDto приходит только id категории,
+        а в Event нужно будет положить всю категорию, дополнительно проверяем наличие категории в БД;
+        */
+        Category category = checkCategoryAvailableInDb(newEventDto.getCategory());
+
+        // Мапим событие и сетим пользователя и категорию;
+        Event event = EventMapper.toEvent(newEventDto);
+        event.setInitiator(initiator);
+        event.setCategory(category);
+
+        // Обновляем Event, так как после сохранения в БД у него появился id;
+        event = eventStorage.save(event);
+
+        log.info("Создано новое событие: {}", event);
+        return EventMapper.fromEventToEventFullDto(event);
+    }
+
+    /*
+    PATCH EVENT - Изменение события добавленного текущим пользователем:
+        Обратите внимание:
+            изменить можно только отмененные события или события в состоянии ожидания модерации
+            если редактируется отменённое событие, то оно автоматически переходит в состояние ожидания модерации
+            дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента
+    */
+    @Override
+    public EventFullDto updateEventByCurrentUser(long userId, UpdateEventRequest updateEventRequest) {
+        /*
+        Из контроллера приходит только id пользователя,
+        а положить в Event нужно всего пользователя, дополнительно проверяем наличие пользователя в БД;
+        */
+        User currentUser = checkUserAvailableInDb(userId);
+
+        // Проверяем наличие события в БД;
+        Event currentEvent = checkEventAvailableInDb(updateEventRequest.getEventId());
+
+        // Проверяем что событие принадлежит текущему пользователю;
+        checkOwnEvent(currentEvent, currentUser);
+
+        // Проверяем чтобы событие не было опубликовано;
+        if (currentEvent.getState().equals(StateEnum.PUBLISHED.toString())) {
+            throw new BadRequestException(String.format("Событие eventId=%s нельзя изменить, так как оно опубликовано", currentEvent.getId()));
+        }
+
+        // Если State был CANCELED, то меняем на PENDING, сохраняем изменения для eventState;
+        if (currentEvent.getState().equals(StateEnum.CANCELED.toString())) {
+            currentEvent.setState(StateEnum.PENDING.toString());
+        }
+
+        // Сначала Мапим ответ, все что пришло в updateEventRequest;
+        EventMapper.fromUpdateEventRequestToEvent(currentEvent, updateEventRequest);
+
+        // Так как новые данные нужно будет сохранить в БД, то нужна вся категория, а не просто catId;
+        if (updateEventRequest.getCategory() != null) {
+            // Проверяем категорию;
+            Category category = checkCategoryAvailableInDb(updateEventRequest.getCategory());
+            currentEvent.setCategory(category);
+        }
+
+        // Обновляем данные в БД;
+        eventStorage.save(currentEvent);
+
+        EventFullDto eventFullDto = EventMapper.fromEventToEventFullDto(currentEvent);
+
+        log.info("Событие изменено: {}", eventFullDto);
+        return eventFullDto;
+    }
+
+    /*
+    GET EVENTS - Получение событий добавленных текущим пользователем:
+    */
+    @Override
+    public List<EventFullDto> getAllEventsByCurrentUser(long userId, Integer from, Integer size) {
+
+        // Проверяем, что пользователь существует;
+        User user = checkUserAvailableInDb(userId);
+
+        // Собираем все события принадлежащие пользователю;
+        List<Event> events = eventStorage.findEventByInitiator_Id(userId, PageRequest.of(from / size, size)).toList();
+
+        log.info("Получение пользователем userId={} списка созданных событий: eventsSize={}", user.getId(), events.size());
+        return events.stream().map(EventMapper::fromEventToEventFullDto).collect(Collectors.toList());
+    }
+
+    /*
+    GET EVENT - Получение полной информации о событии добавленном текущим пользователем:
+    */
+    @Override
+    public EventFullDto getEventByIdByCurrentUser(long userId, long eventId) {
+
+        // Проверяем, что пользователь существует;
+        User user = checkUserAvailableInDb(userId);
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Проверяем что событие принадлежит текущему пользователю;
+        checkOwnEvent(event, user);
+
+        log.info("Получение пользователем userId={} своего события: {}", userId, event);
+        return EventMapper.fromEventToEventFullDto(event);
+    }
+
+    /*
+    PATCH EVENT - Отмена события добавленного текущим пользователем:
+        Обратите внимание:
+            Отменить можно только событие в состоянии ожидания модерации;
+     */
+    @Override
+    public EventFullDto cancelEventByCurrentUser(long userId, long eventId) {
+
+        // Проверяем, что пользователь существует;
+        User user = checkUserAvailableInDb(userId);
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Проверяем что событие принадлежит текущему пользователю;
+        checkOwnEvent(event, user);
+
+        // Проверяем статус;
+        checkStatePending(event);
+
+        // Сетим статус отмены и сохраняем в БД;
+        event.setState(StateEnum.CANCELED.toString());
+        eventStorage.save(event);
+
+        // Мапим EventFullDto из event;
+        EventFullDto result = EventMapper.fromEventToEventFullDto(event);
+
+        log.info("Отмена пользователем userId={} своего события: result={}", userId, result);
+        return result;
+    }
+
+    /*
+    GET EVENT - Получение информации о запросах на участие в событии текущего пользователя:
+    */
+    @Override
+    public List<ParticipationRequestDto> getRequestsByEventByCurrentUser(long userId, long eventId) {
+
+        // Проверяем, что пользователь существует;
+        User user = checkUserAvailableInDb(userId);
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Проверяем что событие принадлежит текущему пользователю;
+        checkOwnEvent(event, user);
+
+        // Находим все реквесты на данное событие;
+        List<Request> requests = requestStorage.findAllByEvent_Id(eventId);
+
+        // Мапим все найденные запросы в лист ParticipationRequestDto;
+        log.info("Получили все запросы на событие: eventId={} созданного пользователем userId={}: requests {}",
+                event.getId(), user.getId(), requests.toString());
+        return requests.stream()
+                .map(RequestMapper::fromRequestToParticipationRequestDto)
+                .collect(Collectors.toList());
+    }
+
+    /*
+    PATCH EVENT - Подтверждение чужой заявки на участие в событии текущего пользователя:
+        Обратите внимание:
+            + если для события лимит заявок равен 0 или отключена пре-модерация заявок, то подтверждение заявок не требуется;
+            нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие;
+            если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить;
+     */
+    @Override
+    public ParticipationRequestDto acceptRequestOnEventByCurrentUser(long userId, long eventId, long reqId) {
+
+        // Проверяем, что пользователь существует;
+        User user = checkUserAvailableInDb(userId);
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Проверяем что событие принадлежит текущему пользователю;
+        checkOwnEvent(event, user);
+
+        // Проверяем что запрос существует;
+        Request request = checkRequestAvailableInDb(reqId);
+
+        ParticipationRequestDto pRDto = RequestMapper.fromRequestToParticipationRequestDto(request);
+
+
+        // Проверяем лимит заявок для участия в событии и модерацию, если нет лимита и отключена модерация;
+        if (checkRequestLimitAndModeration(event)) {
+            // Cетим статус и сохраняем обновленные данные в БД;
+            request.setStatus("CONFIRMED");
+            requestStorage.save(request);
+
+            // Если данный запрос стал последним из одобренных;
+        } else {
+            // Cетим статус и сохраняем обновленные данные в БД;
+            request.setStatus("CONFIRMED");
+            requestStorage.save(request);
+
+            // А остальные не одобренные запросы отклоняем;
+            List<Request> requests = requestStorage.findAllByEvent_IdAndStatus(eventId, "PENDING");
+            requests.forEach(req -> req.setStatus("CANCELED"));
+            requestStorage.saveAll(requests);
+        }
+
+        pRDto.setStatus("CONFIRMED");
+
+        log.info("Пользователь userId={} принял запрос reqId={} на событие: eventId={}",
+                userId, reqId, eventId);
+        return pRDto;
+    }
+
+    /*
+   PATCH EVENT - Отклонение чужой заявки на участие в событии текущего пользователя:
+    */
+    @Override
+    public ParticipationRequestDto cancelRequestOnEventByCurrentUser(long userId, long eventId, long reqId) {
+
+        // Проверяем, что пользователь существует;
+        User user = checkUserAvailableInDb(userId);
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Проверяем что событие принадлежит текущему пользователю;
+        checkOwnEvent(event, user);
+
+        // Проверяем что запрос существует;
+        Request request = checkRequestAvailableInDb(reqId);
+
+        // Сетим новый статус;
+        request.setStatus("REJECTED");
+        requestStorage.save(request);
+
+        log.info("Пользователь userId={} отклонил запрос reqId={} на событие: eventId={}",
+                userId, reqId, eventId);
+        return RequestMapper.fromRequestToParticipationRequestDto(request);
+    }
+
+    /*
+    GET EVENTS - Получение событий с возможностью фильтрации
+        Обратите внимание:
+            + это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события;
+            + текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв;
+            если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени;
+            информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие;
+            информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
+     */
+    @Override
+    public List<EventShortDto> getAllPublicEvents(String text,
+                                                  Long[] categories,
+                                                  Boolean paid,
+                                                  String rangeStart,
+                                                  String rangeEnd,
+                                                  Boolean onlyAvailable,
+                                                  String sort,
+                                                  Integer from,
+                                                  Integer size) {
+
+        // Создаем переменные для метода и записываем в них значения по умолчанию;
+        LocalDateTime start = LocalDateTime.now();
+        LocalDateTime end = null;
+
+        // Если переменные в параметрах метода пришли не пустые, то перезаписываем их;
+        if (rangeStart != null && rangeEnd != null) {
+            start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
+            end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+        }
+
+        // Собираем все события согласно переданным параметрам;
+        List<Event> events = eventStorage.findEventsByAnnotationContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndCategory_IdInAndPaidAndEventDateBetweenOrderByEventDateDesc(
+                text,
+                text,
+                Arrays.stream(categories).toList(),
+                paid,
+                start,
+                end,
+                PageRequest.of(from / size, size)
+        ).stream().toList();
+        // Создаем результирующий объект;
+        List<EventShortDto> result = new ArrayList<>();
+
+        // Для каждого события применяем метод getPublicEventById;
+        for (Event event : events) {
+            EventFullDto eventFullDto = getPublicEventById(event.getId());
+
+            // Мапим в EventShortDto и сохраняем в результат;
+            result.add(EventMapper.fromFullDtoToShortDto(eventFullDto));
+        }
+
+        // Сортируем результат, по умолчанию будет сортировка по EVENT_DATE;
+        if (sort.equals("VIEWS")) {
+            result.sort(Comparator.comparing(EventShortDto::getViews));
+        }
+        log.info("Выводим все публичные события всего: {}", result.size());
+        return result;
+    }
+
+    /*
+    Получение подробной информации об опубликованном событии по его идентификатору
+        Обратите внимание:
+            + событие должно быть опубликовано;
+            -+ информация о событии должна включать в себя количество просмотров и количество подтвержденных запросов;
+            - информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
+     */
+    @Override
+    public EventFullDto getPublicEventById(long eventId) {
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Проверяем статус события;
+        checkStatusPublished(eventId);
+
+        EventFullDto result = EventMapper.fromEventToEventFullDto(event);
+
+        // Проверяем количество подтвержденных запросов и сетим их в результат;
+        result.setConfirmedRequests(getConfirmedRequests(eventId));
+
+        // TODO Тут нужно будет засетить количество просмотров
+        // TODO И сохранить информацию о вызове этого метода в сервисе статистики
+
+        log.info("Выводим публичное событие: {}", result);
+        return result;
+    }
+
+    /*
+    GET EVENT ADMIN - Поиск событий
+        Эндпоинт возвращает полную информацию обо всех событиях подходящих под переданные условия;
+    */
+    @Override
+    public List<EventFullDto> searchEvents(Long[] users,
+                                           String[] states,
+                                           Long[] categories,
+                                           String rangeStart,
+                                           String rangeEnd,
+                                           Integer from,
+                                           Integer size) {
+
+        // TODO Я так понимаю, что тут нужно применить предикаты;
+        // Создаем из стрингов LocalDateTime;
+        LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
+        LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+
+        // Сначала находим список EventState по указанным параметрам, так как там лежат state;
+        List<Event> events =
+                eventStorage.findAllByInitiator_IdInAndCategory_IdInAndEventDateBetweenAndStateIn(
+                        Arrays.stream(users).toList(),
+                        Arrays.stream(categories).toList(),
+                        start,
+                        end,
+                        Arrays.stream(states).toList(),
+                        PageRequest.of(from / size, size))
+                        .stream().toList();
+
+        log.info("Выводим список событий: events.size={}", events.size());
+        return events.stream().map(EventMapper::fromEventToEventFullDto).collect(Collectors.toList());
+    }
+
+    @Override
+    public EventFullDto updateEventByAdmin(long eventId, AdminUpdateEventRequest adminUpdateEventRequest) {
+
+        // Проверяем, что событие существует;
+        Event event = checkEventAvailableInDb(eventId);
+
+        // Мапим новые данные;
+        EventMapper.fromAdminUpdateEventRequestToEvent(event, adminUpdateEventRequest);
+
+        // Категорию сетим отдельно
+        if (adminUpdateEventRequest.getCategory() != null) {
+            Category category = checkCategoryAvailableInDb(adminUpdateEventRequest.getCategory());
+            event.setCategory(category);
+        }
+
+        // Сохраняем обновленные данные в БД;
+        eventStorage.save(event);
+
+        log.info("Админ изменил событие eventId={}: updateEvent={}", eventId, event);
+        return EventMapper.fromEventToEventFullDto(event);
+    }
+
+    /*
+    PUT EVENT ADMIN - Публикация события.
+        Обратите внимание:
+            + дата начала события должна быть не ранее чем за час от даты публикации;
+            + событие должно быть в состоянии ожидания публикации;
+    */
+    @Override
+    public EventFullDto eventPublishByAdmin(long eventId) {
+
+        // Проверяем, что событие существует;
+        Event currentEvent = checkEventAvailableInDb(eventId);
+
+        // Проверяем статус события;
+        checkStatePending(currentEvent);
+
+        // Проверяем дату начала события и публикации, если все в порядке, то сетим и сохраняем;
+        LocalDateTime publishedOn = LocalDateTime.now();
+        checkEventStartDate(currentEvent.getEventDate(), publishedOn);
+        currentEvent.setPublishedOn(publishedOn);
+        currentEvent.setState(StateEnum.PUBLISHED.toString());
+        eventStorage.save(currentEvent);
+
+        // Возвращаемый объект;
+        EventFullDto result = EventMapper.fromEventToEventFullDto(currentEvent);
+
+        log.info("Админ одобрил событие eventId={} теперь оно опубликовано eventStatus={}:", eventId, currentEvent.getState());
+        return result;
+    }
+
+    /*
+    PUT EVENT ADMIN - Отклонение события.
+        Обратите внимание:
+            + событие не должно быть опубликовано;
+    */
+    @Override
+    public EventFullDto eventRejectByAdmin(long eventId) {
+
+        // Проверяем, что событие существует;
+        Event currentEvent = checkEventAvailableInDb(eventId);
+
+        // Проверяем статус события;
+        checkStatePending(currentEvent);
+
+        // Сетим новые данные и сохраняем в БД;
+        currentEvent.setState(StateEnum.CANCELED.toString());
+        eventStorage.save(currentEvent);
+
+        // Возвращаемый объект;
+        EventFullDto result = EventMapper.fromEventToEventFullDto(currentEvent);
+
+        log.info("Админ отклонил событие eventId={} теперь оно отменено eventStatus={}:", eventId, currentEvent.getState());
+        return result;
+    }
+
+    //TODO Посмотреть что можно сделать с этими методами
+    private User checkUserAvailableInDb(long userId) {
+
+        return userStorage.findById(userId)
+                .orElseThrow(() -> new NotFoundException(String
+                        .format("Пользователь не найден в БД: userId=%s", userId)));
+    }
+
+    private Category checkCategoryAvailableInDb(long catId) {
+
+        return categoryStorage.findById(catId)
+                .orElseThrow(() -> new NotFoundException(String
+                        .format("Категория не найдена: catId=%s", catId)));
+    }
+
+    private Request checkRequestAvailableInDb(long reqId) {
+
+        return requestStorage.findById(reqId).orElseThrow(() -> new NotFoundException(String
+                .format("Запрос не найден: reqId=%s", reqId)));
+    }
+
+    @Override
+    public Event checkEventAvailableInDb(long eventId) {
+
+        return eventStorage.findById(eventId)
+                .orElseThrow(() -> new NotFoundException(String
+                        .format("Событие не найдено: eventId=%s", eventId)));
+    }
+
+    /*
+    Метод для проверки инициатора события, что событие принадлежит именно этому пользователю;
+     */
+    private void checkOwnEvent(Event event, User user) {
+
+        if (!event.getInitiator().equals(user)) {
+            throw new BadRequestException(String
+                    .format("Пользователю userId=%s не принадлежит данное событие eventId=%s", user.getId(), event.getId()));
+        }
+        log.info("Проверяем инициатора userId={} своего события: eventId={}", user, event);
+    }
+
+    /*
+    Метод проверяет статус PENDING у EventState;
+     */
+    private void checkStatePending(Event event) {
+
+        if (!event.getState().equals(StateEnum.PENDING.toString())) {
+            throw new BadRequestException(String
+                    .format("Событие имеет статус отличный от модерации state=%s", event.getState()));
+        }
+        log.info("Проверяем статус у eventStateId={} : state={}", event.getId(), event.getState());
+    }
+
+    /*
+    Метод проверяет статус PUBLISHED у EventState;
+    */
+    @Override
+    public Event checkStatusPublished(long eventId) {
+
+        // Проверяем наличие Evevnt в БД;
+        Event event = checkEventAvailableInDb(eventId);
+
+        if (!event.getState().equals(StateEnum.PUBLISHED.toString())) {
+            throw new BadRequestException(String
+                    .format("Событие должно быть опубликовано: state=%s", event.getState()));
+        }
+        log.info("Проверяем статус у eventStateId={} : state={}", event.getId(), event.getState());
+        return event;
+    }
+
+    /*
+    Метод проверяет количество подтвержденных запросов на участие в событии;
+    */
+    private Long getConfirmedRequests(long eventId) {
+
+        // Собираем все подтвержденные запросы на событие;
+        List<Request> confirmedRequests = requestStorage.findAllByEvent_IdAndStatus(eventId, "CONFIRMED");
+
+        log.info("Подтвержденных запросов у события eventId={}: confirmedRequests={}", eventId, confirmedRequests.size());
+        return (long) confirmedRequests.size();
+    }
+
+    /*
+    Метод проверяет время начала события и время публикации;
+     */
+    private void checkEventStartDate(LocalDateTime eventDate, LocalDateTime publishedOn) {
+
+        if (!eventDate.isAfter(publishedOn.plusHours(1))) {
+            throw new BadRequestException(String
+                    .format("Событие не может быть опубликовано, так как дата начала eventDate=%s менее чем через" +
+                            " час после даты публикации publishedOn=%s", eventDate, publishedOn));
+        }
+    }
+
+    /*
+    Метод получает все события по пришедшим id;
+     */
+    @Override
+    public List<Event> getEventsByIds(List<Long> ids) {
+
+        log.info("Получаем все события по ids={}", ids.toString());
+        return eventStorage.findEventsByIdIn(ids);
+    }
+
+    /*
+    Метод проверяет количество одобренных заявок;
+    */
+    @Override
+    public Boolean checkRequestLimitAndModeration(Event event) {
+
+        long totalLimit = event.getParticipantLimit();
+
+        // Если нет лимита и отключена модерация;
+        if (totalLimit == 0
+                && event.getRequestModeration().equals(Boolean.FALSE)) {
+            return true;
+        }
+        // Находим количество всех одобренных заявок;
+        long currentLimit = requestStorage.findAllByEvent_IdAndStatus(event.getId(), "CONFIRMED").size();
+
+        // Если осталось последнее место;
+        if (totalLimit == currentLimit + 1) {
+            return false;
+            // Если лимит исчерпан;
+        } else if (currentLimit >= totalLimit) {
+            throw new BadRequestException(String.format("Лимит заявок на событие превышен: eventId=%s", event.getId()));
+        }
+        return true;
+    }
+
+//    public List<Predicate> getPredicates(EventFilterDto eventFilterDto,
+//                                         CriteriaBuilder cb,
+//                                         Root<Event> event) {
+//
+//        // Создаем лист куда будем складывать предикаты;
+//        List<Predicate> predicates = new ArrayList<>();
+//
+//        // Long[] users
+//        if (eventFilterDto.getUsers() != null) {
+//            Predicate usersPredicate = cb.equal(
+//                    event.get("initiator").get("id"), eventFilterDto.getUsers());
+//        }
+//
+//        if (eventFilterDto.getStates() != null) {
+//            Predicate statesPredicate = cb.equal(
+//                    event.get("initiator").get("id"), eventFilterDto.getUsers());
+//        }
+//
+//    }
+
+}
