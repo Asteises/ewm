@@ -117,7 +117,8 @@ public class CategoryServiceImpl implements CategoryService {
         return CategoryMapper.categoryToCategoryDto(category);
     }
 
-    private Category checkCategory(long catId) {
+    @Override
+    public Category checkCategory(long catId) {
 
         log.info("Проверяем существование категории catId={}", catId);
         return categoryStorage.findById(catId)

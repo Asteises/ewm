@@ -60,10 +60,13 @@ public class EventMapper {
         EventFullDto eventFullDto = new EventFullDto();
 
         eventFullDto.setId(event.getId());
+        eventFullDto.setState(StateEnum.fromValue(event.getState()));
         eventFullDto.setTitle(event.getTitle());
         eventFullDto.setAnnotation(event.getAnnotation());
+        eventFullDto.setCategory(CategoryMapper.categoryToCategoryDto(event.getCategory()));
         eventFullDto.setPaid(event.getPaid());
         eventFullDto.setEventDate(event.getEventDate().format(FORMATTER_EVENT_DATE));
+        eventFullDto.setInitiator(UserMapper.userToUserShortDto(event.getInitiator()));
         eventFullDto.setDescription(event.getDescription());
         eventFullDto.setParticipantLimit(event.getParticipantLimit().intValue());
 
@@ -94,7 +97,7 @@ public class EventMapper {
         return eventShortDto;
     }
 
-    public static void fromUpdateEventRequestToEvent(Event event, UpdateEventRequest updateEventRequest) {
+    public static Event fromUpdateEventRequestToEvent(Event event, UpdateEventRequest updateEventRequest) {
 
         if (updateEventRequest.getAnnotation() != null) {
             event.setAnnotation(updateEventRequest.getAnnotation());
@@ -115,6 +118,7 @@ public class EventMapper {
         if (updateEventRequest.getTitle() != null) {
             event.setTitle(updateEventRequest.getTitle());
         }
+        return event;
     }
 
     public static void fromAdminUpdateEventRequestToEvent(Event event, AdminUpdateEventRequest adminUpdateEventRequest) {

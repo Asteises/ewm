@@ -5,6 +5,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import ru.praktikum.mainservice.event.model.Event;
 import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
+import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
 import ru.praktikum.mainservice.event.model.dto.NewEventDto;
 import ru.praktikum.mainservice.request.model.dto.ParticipationRequestDto;
@@ -31,15 +32,7 @@ public interface EventService {
 
     ParticipationRequestDto cancelRequestOnEventByCurrentUser(long userId, long eventId, long reqId);
 
-    List<EventShortDto> getAllPublicEvents(String text,
-                                           Long[] categories,
-                                           Boolean paid,
-                                           String rangeStart,
-                                           String rangeEnd,
-                                           Boolean onlyAvailable,
-                                           String sort,
-                                           Integer from,
-                                           Integer size);
+    List<EventShortDto> getAllPublicEvents(EventPublicFilterDto eventPublicFilterDto, Integer from, Integer size);
 
     EventFullDto getPublicEventById(@PathVariable long id);
 

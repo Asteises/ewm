@@ -135,7 +135,6 @@ public class CompilationServiceImpl implements CompilationService {
     DELETE COMPILATION - Удаление подборки
      */
     @Override
-    @Transactional
     public void deleteCompilation(long compId) {
 
         // Проверяем существование подборки;

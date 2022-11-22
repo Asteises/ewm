@@ -3,7 +3,7 @@ package ru.praktikum.statsservice.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import ru.praktikum.statsservice.StatService;
+import ru.praktikum.statsservice.service.StatService;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;
 import ru.praktikum.statsservice.model.dto.ViewStatsDto;
 

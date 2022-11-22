@@ -1,4 +1,4 @@
-package ru.praktikum.statsservice;
+package ru.praktikum.statsservice.service;
 
 import org.springframework.stereotype.Service;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;

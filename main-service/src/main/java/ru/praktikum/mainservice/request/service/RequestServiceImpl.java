@@ -73,7 +73,6 @@ public class RequestServiceImpl implements RequestService {
         // Сохраняем запрос в БД и обновляем, чтобы записать id;
         request = requestStorage.save(request);
 
-        // TODO Проблема с тестом в Postman - eventId = 0
         log.info("Пользователь userId={} создает новый запрос а событие eventId={}", userId, eventId);
         return RequestMapper.fromRequestToParticipationRequestDto(request);
     }
@@ -86,6 +85,8 @@ public class RequestServiceImpl implements RequestService {
         Request request = checkRequestAvailableInDb(requestId);
         request.setStatus(StateEnum.CANCELED.toString());
         requestStorage.save(request);
+
+        log.info("Пользователь userId={} отменил запрос requestId={} на событие.", userId, requestId);
         return RequestMapper.fromRequestToParticipationRequestDto(request);
     }
 
@@ -95,7 +96,9 @@ public class RequestServiceImpl implements RequestService {
     @Override
     public List<ParticipationRequestDto> getRequests(long userId) {
         User user = userService.checkUserAvailableInDb(userId);
-        List<Request> requests = requestStorage.findAllByRequester_Id(userId);
+        List<Request> requests = requestStorage.findAllByRequester_Id(user.getId());
+
+        log.info("Получаем информацию о всех заявках requests={} на событие пользователя userId={}.", requests.size(), userId);
         return requests.stream().map(RequestMapper::fromRequestToParticipationRequestDto).collect(Collectors.toList());
     }
 
@@ -129,14 +132,4 @@ public class RequestServiceImpl implements RequestService {
         }
     }
 
-    /*
-    Метод проверяет, что событие, на которое отправляется запрос опубликовано;
-     */
-    private void checkEventNotPublished(long eventId) {
-        Event eventState = eventService.checkStatusPublished(eventId);
-        if (!eventState.getState().equals("PUBLISHED")) {
-            throw new BadRequestException(String.format("Запрос не может быть создан на неопубликованное " +
-                    "событие eventId={}", eventId));
-        }
-    }
 }

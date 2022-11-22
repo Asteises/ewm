@@ -5,12 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import ru.praktikum.mainservice.category.model.Category;
-import ru.praktikum.mainservice.category.repository.CategoryStorage;
+import ru.praktikum.mainservice.category.service.CategoryService;
 import ru.praktikum.mainservice.event.enums.StateEnum;
 import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.Event;
 import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
+import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
 import ru.praktikum.mainservice.event.model.dto.NewEventDto;
 import ru.praktikum.mainservice.event.repository.EventStorage;
@@ -22,9 +23,8 @@ import ru.praktikum.mainservice.request.model.dto.ParticipationRequestDto;
 import ru.praktikum.mainservice.request.model.dto.UpdateEventRequest;
 import ru.praktikum.mainservice.request.repository.RequestStorage;
 import ru.praktikum.mainservice.user.model.User;
-import ru.praktikum.mainservice.user.repository.UserStorage;
+import ru.praktikum.mainservice.user.service.UserService;
 
-import javax.persistence.EntityManager;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,11 +38,9 @@ import java.util.stream.Collectors;
 public class EventServiceImpl implements EventService {
 
     private final EventStorage eventStorage;
-    private final UserStorage userStorage;
-    private final CategoryStorage categoryStorage;
+    private final UserService userService;
+    private final CategoryService categoryService;
     private final RequestStorage requestStorage;
-
-    private EntityManager entityManager;
 
     /*
     POST EVENT - Добавление нового события:
@@ -55,18 +53,19 @@ public class EventServiceImpl implements EventService {
         Из контроллера приходит только id пользователя,
         а положить в Event нужно всего пользователя, дополнительно проверяем наличие пользователя в БД;
         */
-        User initiator = checkUserAvailableInDb(userId);
+        User initiator = userService.checkUserAvailableInDb(userId);
 
         /*
         В NewEventDto приходит только id категории,
         а в Event нужно будет положить всю категорию, дополнительно проверяем наличие категории в БД;
         */
-        Category category = checkCategoryAvailableInDb(newEventDto.getCategory());
+        Category category = categoryService.checkCategory(newEventDto.getCategory());
 
-        // Мапим событие и сетим пользователя и категорию;
+        // Мапим событие и сетим пользователя, категорию и статус;
         Event event = EventMapper.toEvent(newEventDto);
         event.setInitiator(initiator);
         event.setCategory(category);
+        event.setState(StateEnum.PENDING.toString());
 
         // Обновляем Event, так как после сохранения в БД у него появился id;
         event = eventStorage.save(event);
@@ -88,7 +87,7 @@ public class EventServiceImpl implements EventService {
         Из контроллера приходит только id пользователя,
         а положить в Event нужно всего пользователя, дополнительно проверяем наличие пользователя в БД;
         */
-        User currentUser = checkUserAvailableInDb(userId);
+        User currentUser = userService.checkUserAvailableInDb(userId);
 
         // Проверяем наличие события в БД;
         Event currentEvent = checkEventAvailableInDb(updateEventRequest.getEventId());
@@ -109,20 +108,24 @@ public class EventServiceImpl implements EventService {
         // Сначала Мапим ответ, все что пришло в updateEventRequest;
         EventMapper.fromUpdateEventRequestToEvent(currentEvent, updateEventRequest);
 
+        // Добавляем юзера;
+        currentEvent.setInitiator(currentUser);
+
         // Так как новые данные нужно будет сохранить в БД, то нужна вся категория, а не просто catId;
         if (updateEventRequest.getCategory() != null) {
             // Проверяем категорию;
-            Category category = checkCategoryAvailableInDb(updateEventRequest.getCategory());
+            Category category = categoryService.checkCategory(updateEventRequest.getCategory());
             currentEvent.setCategory(category);
         }
 
         // Обновляем данные в БД;
         eventStorage.save(currentEvent);
 
-        EventFullDto eventFullDto = EventMapper.fromEventToEventFullDto(currentEvent);
+        // Мапим результирующий объект;
+        EventFullDto result = EventMapper.fromEventToEventFullDto(currentEvent);
 
-        log.info("Событие изменено: {}", eventFullDto);
-        return eventFullDto;
+        log.info("Событие изменено: {}", result);
+        return result;
     }
 
     /*
@@ -132,7 +135,7 @@ public class EventServiceImpl implements EventService {
     public List<EventFullDto> getAllEventsByCurrentUser(long userId, Integer from, Integer size) {
 
         // Проверяем, что пользователь существует;
-        User user = checkUserAvailableInDb(userId);
+        User user = userService.checkUserAvailableInDb(userId);
 
         // Собираем все события принадлежащие пользователю;
         List<Event> events = eventStorage.findEventByInitiator_Id(userId, PageRequest.of(from / size, size)).toList();
@@ -148,7 +151,7 @@ public class EventServiceImpl implements EventService {
     public EventFullDto getEventByIdByCurrentUser(long userId, long eventId) {
 
         // Проверяем, что пользователь существует;
-        User user = checkUserAvailableInDb(userId);
+        User user = userService.checkUserAvailableInDb(userId);
 
         // Проверяем, что событие существует;
         Event event = checkEventAvailableInDb(eventId);
@@ -169,7 +172,7 @@ public class EventServiceImpl implements EventService {
     public EventFullDto cancelEventByCurrentUser(long userId, long eventId) {
 
         // Проверяем, что пользователь существует;
-        User user = checkUserAvailableInDb(userId);
+        User user = userService.checkUserAvailableInDb(userId);
 
         // Проверяем, что событие существует;
         Event event = checkEventAvailableInDb(eventId);
@@ -198,7 +201,7 @@ public class EventServiceImpl implements EventService {
     public List<ParticipationRequestDto> getRequestsByEventByCurrentUser(long userId, long eventId) {
 
         // Проверяем, что пользователь существует;
-        User user = checkUserAvailableInDb(userId);
+        User user = userService.checkUserAvailableInDb(userId);
 
         // Проверяем, что событие существует;
         Event event = checkEventAvailableInDb(eventId);
@@ -228,7 +231,7 @@ public class EventServiceImpl implements EventService {
     public ParticipationRequestDto acceptRequestOnEventByCurrentUser(long userId, long eventId, long reqId) {
 
         // Проверяем, что пользователь существует;
-        User user = checkUserAvailableInDb(userId);
+        User user = userService.checkUserAvailableInDb(userId);
 
         // Проверяем, что событие существует;
         Event event = checkEventAvailableInDb(eventId);
@@ -274,7 +277,7 @@ public class EventServiceImpl implements EventService {
     public ParticipationRequestDto cancelRequestOnEventByCurrentUser(long userId, long eventId, long reqId) {
 
         // Проверяем, что пользователь существует;
-        User user = checkUserAvailableInDb(userId);
+        User user = userService.checkUserAvailableInDb(userId);
 
         // Проверяем, что событие существует;
         Event event = checkEventAvailableInDb(eventId);
@@ -304,36 +307,13 @@ public class EventServiceImpl implements EventService {
             информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
      */
     @Override
-    public List<EventShortDto> getAllPublicEvents(String text,
-                                                  Long[] categories,
-                                                  Boolean paid,
-                                                  String rangeStart,
-                                                  String rangeEnd,
-                                                  Boolean onlyAvailable,
-                                                  String sort,
+    public List<EventShortDto> getAllPublicEvents(EventPublicFilterDto dto,
                                                   Integer from,
                                                   Integer size) {
 
-        // Создаем переменные для метода и записываем в них значения по умолчанию;
-        LocalDateTime start = LocalDateTime.now();
-        LocalDateTime end = null;
-
-        // Если переменные в параметрах метода пришли не пустые, то перезаписываем их;
-        if (rangeStart != null && rangeEnd != null) {
-            start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
-            end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
-        }
-
         // Собираем все события согласно переданным параметрам;
-        List<Event> events = eventStorage.findEventsByAnnotationContainingIgnoreCaseOrDescriptionContainingIgnoreCaseAndCategory_IdInAndPaidAndEventDateBetweenOrderByEventDateDesc(
-                text,
-                text,
-                Arrays.stream(categories).toList(),
-                paid,
-                start,
-                end,
-                PageRequest.of(from / size, size)
-        ).stream().toList();
+        List<Event> events = eventStorage.findAllEventsByFilterParams(dto, PageRequest.of(from / size, size));
+
         // Создаем результирующий объект;
         List<EventShortDto> result = new ArrayList<>();
 
@@ -346,7 +326,7 @@ public class EventServiceImpl implements EventService {
         }
 
         // Сортируем результат, по умолчанию будет сортировка по EVENT_DATE;
-        if (sort.equals("VIEWS")) {
+        if (dto.getSort().equals("VIEWS")) {
             result.sort(Comparator.comparing(EventShortDto::getViews));
         }
         log.info("Выводим все публичные события всего: {}", result.size());
@@ -402,12 +382,12 @@ public class EventServiceImpl implements EventService {
         // Сначала находим список EventState по указанным параметрам, так как там лежат state;
         List<Event> events =
                 eventStorage.findAllByInitiator_IdInAndCategory_IdInAndEventDateBetweenAndStateIn(
-                        Arrays.stream(users).toList(),
-                        Arrays.stream(categories).toList(),
-                        start,
-                        end,
-                        Arrays.stream(states).toList(),
-                        PageRequest.of(from / size, size))
+                                Arrays.stream(users).toList(),
+                                Arrays.stream(categories).toList(),
+                                start,
+                                end,
+                                Arrays.stream(states).toList(),
+                                PageRequest.of(from / size, size))
                         .stream().toList();
 
         log.info("Выводим список событий: events.size={}", events.size());
@@ -425,7 +405,7 @@ public class EventServiceImpl implements EventService {
 
         // Категорию сетим отдельно
         if (adminUpdateEventRequest.getCategory() != null) {
-            Category category = checkCategoryAvailableInDb(adminUpdateEventRequest.getCategory());
+            Category category = categoryService.checkCategory(adminUpdateEventRequest.getCategory());
             event.setCategory(category);
         }
 
@@ -488,21 +468,6 @@ public class EventServiceImpl implements EventService {
 
         log.info("Админ отклонил событие eventId={} теперь оно отменено eventStatus={}:", eventId, currentEvent.getState());
         return result;
-    }
-
-    //TODO Посмотреть что можно сделать с этими методами
-    private User checkUserAvailableInDb(long userId) {
-
-        return userStorage.findById(userId)
-                .orElseThrow(() -> new NotFoundException(String
-                        .format("Пользователь не найден в БД: userId=%s", userId)));
-    }
-
-    private Category checkCategoryAvailableInDb(long catId) {
-
-        return categoryStorage.findById(catId)
-                .orElseThrow(() -> new NotFoundException(String
-                        .format("Категория не найдена: catId=%s", catId)));
     }
 
     private Request checkRequestAvailableInDb(long reqId) {
@@ -619,25 +584,5 @@ public class EventServiceImpl implements EventService {
         }
         return true;
     }
-
-//    public List<Predicate> getPredicates(EventFilterDto eventFilterDto,
-//                                         CriteriaBuilder cb,
-//                                         Root<Event> event) {
-//
-//        // Создаем лист куда будем складывать предикаты;
-//        List<Predicate> predicates = new ArrayList<>();
-//
-//        // Long[] users
-//        if (eventFilterDto.getUsers() != null) {
-//            Predicate usersPredicate = cb.equal(
-//                    event.get("initiator").get("id"), eventFilterDto.getUsers());
-//        }
-//
-//        if (eventFilterDto.getStates() != null) {
-//            Predicate statesPredicate = cb.equal(
-//                    event.get("initiator").get("id"), eventFilterDto.getUsers());
-//        }
-//
-//    }
 
 }

@@ -1,4 +1,4 @@
-package ru.praktikum.statsservice;
+package ru.praktikum.statsservice.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

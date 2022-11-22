@@ -1,7 +1,9 @@
-package ru.praktikum.statsservice;
+package ru.praktikum.statsservice.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import ru.praktikum.statsservice.repository.StatStorage;
+import ru.praktikum.statsservice.mapper.StatMapper;
 import ru.praktikum.statsservice.model.EndpointHit;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;
 

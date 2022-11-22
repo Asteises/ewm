@@ -5,6 +5,8 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.Setter;
 
+import java.time.LocalDateTime;
+
 @Getter
 @Setter
 @RequiredArgsConstructor
@@ -15,8 +17,8 @@ public class EventPublicFilterDto {
     private String text;
     private Long[] categories;
     private Boolean paid;
-    private String rangeStart;
-    private String rangeEnd;
+    private LocalDateTime rangeStart;
+    private LocalDateTime rangeEnd;
     private Boolean onlyAvailable;
     private String sort;
 }

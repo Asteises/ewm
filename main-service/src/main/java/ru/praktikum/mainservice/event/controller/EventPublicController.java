@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import ru.praktikum.mainservice.client.StatClient;
+import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
 import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
@@ -12,6 +13,7 @@ import ru.praktikum.mainservice.event.service.EventService;
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Slf4j
@@ -54,30 +56,22 @@ public class EventPublicController {
         log.info("endpoint path: {}", request.getRequestURI());
         statClient.saveRequestInfo(request);
 
+        // Для простоты создаем отдельное дто со всеми входящими параметрами;
         EventPublicFilterDto eventPublicFilterDto = new EventPublicFilterDto(
                 "PUBLISHED",
                 text,
                 categories,
                 paid,
-                rangeStart,
-                rangeEnd,
+                LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE),
+                LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE),
                 onlyAvailable,
                 sort);
 
-        List<EventShortDto> events = eventService.getAllPublicEvents(
-                text,
-                categories,
-                paid,
-                rangeStart,
-                rangeEnd,
-                onlyAvailable,
-                sort,
-                from,
-                size);
+        List<EventShortDto> result = eventService.getAllPublicEvents(eventPublicFilterDto, from, size);
 
-        events.forEach(eventShortDto -> eventShortDto.setViews(statClient.getViews(eventShortDto.getId())));
+        result.forEach(eventShortDto -> eventShortDto.setViews(statClient.getViews(eventShortDto.getId())));
 
-        return events;
+        return result;
     }
 
     /*

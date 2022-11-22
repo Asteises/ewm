@@ -2,13 +2,16 @@ package ru.praktikum.mainservice.event.repository;
 
 import org.springframework.data.domain.Pageable;
 import ru.praktikum.mainservice.event.model.Event;
-import ru.praktikum.mainservice.event.model.dto.EventFullDto;
 import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 
 import javax.persistence.EntityManager;
 import javax.persistence.PersistenceContext;
 import javax.persistence.TypedQuery;
-import javax.persistence.criteria.*;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Expression;
+import javax.persistence.criteria.Predicate;
+import javax.persistence.criteria.Root;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -21,7 +24,7 @@ public class EventStorageCustomImpl implements EventStorageCustom {
 
     // Ищем только опубликованные события: State - PUBLISHED
     @Override
-    public List<Event> findAllEventsByFilterParams(EventPublicFilterDto eventPublicFilterDto, Pageable pageable) {
+    public List<Event> findAllEventsByFilterParams(EventPublicFilterDto dto, Pageable pageable) {
 
         // Создаем менеджер для работы с предикатами;
         CriteriaBuilder cb = entityManager.getCriteriaBuilder();
@@ -31,15 +34,17 @@ public class EventStorageCustomImpl implements EventStorageCustom {
         Root<Event> event = query.from(Event.class);
 
         // Создаем список куда будем складывать предикаты;
-        List<Predicate> predicates = getPredicates(eventPublicFilterDto, cb, event);
+        List<Predicate> predicates = getPredicates(dto, cb, event);
 
         Predicate eventPredicate = cb.and(predicates.toArray(new Predicate[0]));
 
         query.where(eventPredicate);
 
         // // Вариант сортировки: по дате события или по количеству просмотров Available values : EVENT_DATE, VIEWS
-        if (eventPublicFilterDto.getSort().equals("EVENT_DATE")) {
-
+        if (dto.getSort().equals("EVENT_DATE")) {
+            query.orderBy(cb.desc(event.get("eventDate")));
+        } else if (dto.getSort().equals("VIEWS")) {
+            query.orderBy(cb.desc(event.get("views")));
         }
 
         TypedQuery<Event> typedQuery = entityManager.createQuery(query);
@@ -48,67 +53,49 @@ public class EventStorageCustomImpl implements EventStorageCustom {
 
     private List<Predicate> getPredicates(EventPublicFilterDto eventDto,
                                           CriteriaBuilder cb,
-                                          Root<Event> eventState) {
+                                          Root<Event> event) {
 
+        // Создаем лист предикатов;
         List<Predicate> predicates = new ArrayList<>();
 
+        // Далее проверяем каждый параметр;
         if (eventDto.getState() != null) {
-            Predicate statePredicate = cb.equal(eventState.get("state"), eventDto.getState());
+            Predicate statePredicate = cb.equal(event.get("state"), eventDto.getState());
             predicates.add(statePredicate);
         }
 
         if (eventDto.getText() != null) {
-            Predicate textAnnotationPredicate = cb.equal(eventState.get("event").get("annotation"), eventDto.getText());
+            Predicate textAnnotationPredicate = cb.equal(event.get("event").get("annotation"), eventDto.getText());
             predicates.add(textAnnotationPredicate);
 
-            Predicate textDescriptionPredicate = cb.equal(eventState.get("event").get("description"), eventDto.getText());
+            Predicate textDescriptionPredicate = cb.equal(event.get("event").get("description"), eventDto.getText());
             predicates.add(textDescriptionPredicate);
         }
 
         if (eventDto.getCategories() != null) {
             List<Long> catIds = Arrays.asList(eventDto.getCategories());
 
-            Expression<Long> catEventIds = eventState.get("event").get("category").get("id");
+            Expression<Long> catEventIds = event.get("event").get("category").get("id");
 
             Predicate predicateCatIn = catEventIds.in(catIds);
             predicates.add(predicateCatIn);
         }
 
         if (eventDto.getPaid() != null) {
-            Predicate paidPredicate = cb.equal(eventState.get("event").get("paid"), eventDto.getPaid());
+            Predicate paidPredicate = cb.equal(event.get("event").get("paid"), eventDto.getPaid());
             predicates.add(paidPredicate);
         }
 
         if (eventDto.getRangeStart() != null && eventDto.getRangeEnd() != null) {
-            Predicate rangeStartEndPredicate = cb.between(eventState.get("createdOn"),
+            Predicate rangeStartEndPredicate = cb.between(event.get("createdOn"),
                     eventDto.getRangeStart(),
                     eventDto.getRangeEnd());
             predicates.add(rangeStartEndPredicate);
+        } else {
+            Predicate rangeStartPredicate = cb.greaterThan(event.get("createdOn"),
+                    eventDto.getRangeStart());
+            predicates.add(rangeStartPredicate);
         }
-
         return predicates;
-    }
-
-    public List<EventFullDto> searchEventsByPredicates(Long[] users,
-                                                       String[] states,
-                                                       Long[] categories,
-                                                       String rangeStart,
-                                                       String rangeEnd,
-                                                       Integer from,
-                                                       Integer size) {
-
-        // Создаем менеджер для работы с предикатами;
-        CriteriaBuilder cb = entityManager.getCriteriaBuilder();
-
-        // Какой объект мы хотим получить в результате запроса;
-        CriteriaQuery<Event> query = cb.createQuery(Event.class);
-
-        // Как RawMApper, позволяет работать с объектами выбранного класса;
-        Root<Event> order = query.from(Event.class);
-
-        // Создаем список куда будем складывать предикаты;
-//        List<Predicate> predicates = getPredicates(orderFilterDto, cb, order);
-
-        return null;
     }
 }
