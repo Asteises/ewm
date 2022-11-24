@@ -63,7 +63,7 @@ public class EventAdminController {
                 size);
 
         for (EventFullDto eventFullDto : result) {
-            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId());
+            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId()).getBody();
             eventFullDto.setViews(views);
         }
 

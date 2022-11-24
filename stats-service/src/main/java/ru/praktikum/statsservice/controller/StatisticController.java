@@ -51,7 +51,8 @@ public class StatisticController {
                                      @RequestParam String start,
                                      @RequestParam String end) {
 
-        log.info("Получаем статистику просмотров для: eventId={}", eventId);
-        return statService.findAllByUri("/stats/" + eventId, start, end);
+        Integer integer = statService.findAllByUri("/stats/" + eventId, start, end);
+        log.info("Получаем статистику просмотров для: eventId={}, integer={}", eventId, integer);
+        return integer;
     }
 }

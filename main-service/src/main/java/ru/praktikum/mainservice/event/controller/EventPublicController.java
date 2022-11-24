@@ -97,7 +97,7 @@ public class EventPublicController {
         log.info("endpoint path: {}", request.getRequestURI());
         statClient.saveRequestInfo(request);
 
-        Integer views = (Integer) statClient.getStatsByEventId(id);
+        Integer views = (Integer) statClient.getStatsByEventId(id).getBody();
 
         EventFullDto eventFullDto = eventService.getPublicEventById(id);
         eventFullDto.setViews(views);

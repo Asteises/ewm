@@ -93,6 +93,8 @@ public class StatServiceImpl implements StatService {
         LocalDateTime currentStart = LocalDateTime.parse(start, FORMATTER_EVENT_DATE);
         LocalDateTime currentEnd = LocalDateTime.parse(end, FORMATTER_EVENT_DATE);
 
-        return statStorage.findAllByUriAndCreatedBetween(uri, currentStart, currentEnd).size();
+        Integer integer = statStorage.findAllByUriAndCreatedBetween(uri, currentStart, currentEnd).size();
+        log.info("Получаем статистику просмотров: integer={}", integer);
+        return integer;
     }
 }

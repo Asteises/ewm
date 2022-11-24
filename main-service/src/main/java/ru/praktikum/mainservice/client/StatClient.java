@@ -53,11 +53,10 @@ public class StatClient extends BaseClient {
         );
 
         log.info("uris={}", uris);
-        return get("/stats", parametrs);
+        return get("/stats/", parametrs);
     }
 
-    // TODO Как вернуть что-то кроме Object или преобразовать его в нужный нам объект?
-    public Integer getStatsByEventId(long eventId) {
+    public ResponseEntity<Object> getStatsByEventId(long eventId) {
         String path = "/stats/" + eventId;
 
         Map<String, Object> parametrs = Map.of(
@@ -67,8 +66,10 @@ public class StatClient extends BaseClient {
                 "unique", false
         );
 
-        log.info("Получаем статистику просмотров для eventId={}", eventId);
-        return getInteger(path, parametrs);
+        ResponseEntity<Object> response = get(path, parametrs);
+
+        log.info("Получаем статистику просмотров для eventId={}: response={}", eventId, response.getBody());
+        return response;
     }
 
 }
