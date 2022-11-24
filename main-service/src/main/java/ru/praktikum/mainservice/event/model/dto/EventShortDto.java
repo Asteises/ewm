@@ -11,7 +11,6 @@ import ru.praktikum.mainservice.user.model.dto.UserShortDto;
 /**
  * Краткая информация о событии
  */
-
 @Validated
 @Data
 @NoArgsConstructor
@@ -42,5 +41,5 @@ public class EventShortDto {
     private String title;
 
     @JsonProperty("views")
-    private Long views;
+    private Integer views;
 }

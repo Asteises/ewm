@@ -2,11 +2,11 @@ package ru.praktikum.mainservice.event.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import ru.praktikum.mainservice.client.StatClient;
 import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
-import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
 import ru.praktikum.mainservice.event.service.EventService;
 
@@ -14,6 +14,8 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -23,14 +25,14 @@ import java.util.List;
 public class EventPublicController {
 
     private final EventService eventService;
-
     private final StatClient statClient;
 
+    // TODO
     /*
     GET EVENTS - Получение событий с возможностью фильтрации
         Обратите внимание:
-            это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события;
-            текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв;
+            + это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события;
+            + текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв;
             если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени;
             информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие;
             информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
@@ -51,26 +53,29 @@ public class EventPublicController {
                         "rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
                 text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
 
+        LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
+        LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+
         // Информация для сервиса статистики;
         log.info("client ip: {}", request.getRemoteAddr());
         log.info("endpoint path: {}", request.getRequestURI());
         statClient.saveRequestInfo(request);
 
-        // Для простоты создаем отдельное дто со всеми входящими параметрами;
-        EventPublicFilterDto eventPublicFilterDto = new EventPublicFilterDto(
-                "PUBLISHED",
+        List<EventShortDto> result = eventService.getAllPublicEvents(
                 text,
-                categories,
+                Arrays.stream(categories).toList(),
                 paid,
-                LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE),
-                LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE),
-                onlyAvailable,
-                sort);
+                rangeStart,
+                rangeEnd,
+                sort,
+                from,
+                size);
 
-        List<EventShortDto> result = eventService.getAllPublicEvents(eventPublicFilterDto, from, size);
-
-        result.forEach(eventShortDto -> eventShortDto.setViews(statClient.getViews(eventShortDto.getId())));
-
+        for (EventShortDto eventShortDto : result) {
+            Object o = statClient.getStatsByEventId(eventShortDto.getId());
+            Integer views = (Integer) o;
+            eventShortDto.setViews(views);
+        }
         return result;
     }
 
@@ -92,6 +97,11 @@ public class EventPublicController {
         log.info("endpoint path: {}", request.getRequestURI());
         statClient.saveRequestInfo(request);
 
-        return eventService.getPublicEventById(id);
+        Integer views = (Integer) statClient.getStatsByEventId(id);
+
+        EventFullDto eventFullDto = eventService.getPublicEventById(id);
+        eventFullDto.setViews(views);
+
+        return eventFullDto;
     }
 }

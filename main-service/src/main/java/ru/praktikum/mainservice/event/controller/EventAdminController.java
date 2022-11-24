@@ -3,12 +3,15 @@ package ru.praktikum.mainservice.event.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
+import ru.praktikum.mainservice.client.StatClient;
+import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
 import ru.praktikum.mainservice.event.service.EventService;
 
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,6 +23,9 @@ public class EventAdminController {
 
     private final EventService eventService;
 
+    private final StatClient statClient;
+
+    // TODO
     /*
     GET EVENT ADMIN - Поиск событий.
         Эндпоинт возвращает полную информацию обо всех событиях подходящих под переданные условия;
@@ -33,10 +39,35 @@ public class EventAdminController {
                                            @PositiveOrZero @RequestParam(defaultValue = "0") Integer from,
                                            @Positive @RequestParam(defaultValue = "10") Integer size) {
 
+
+        LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
+        LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+
         log.info("Получаем все события с учетом параметров: users={}, states={}, categories={}, " +
                         "rangeStart={}, rangeEnd={}, from={}, size={}",
-                Arrays.toString(users), Arrays.toString(states), Arrays.toString(categories), rangeStart, rangeEnd, from, size);
-        return eventService.searchEvents(users, states, categories, rangeStart, rangeEnd, from, size);
+                Arrays.toString(users),
+                Arrays.toString(states),
+                Arrays.toString(categories),
+                rangeStart,
+                rangeEnd,
+                from,
+                size);
+
+        List<EventFullDto> result = eventService.searchEvents(
+                users,
+                states,
+                categories,
+                rangeStart,
+                rangeEnd,
+                from,
+                size);
+
+        for (EventFullDto eventFullDto : result) {
+            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId());
+            eventFullDto.setViews(views);
+        }
+
+        return result;
     }
 
     /*

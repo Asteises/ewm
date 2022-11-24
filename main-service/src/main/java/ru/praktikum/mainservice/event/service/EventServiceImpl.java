@@ -3,15 +3,16 @@ package ru.praktikum.mainservice.event.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import ru.praktikum.mainservice.category.model.Category;
 import ru.praktikum.mainservice.category.service.CategoryService;
+import ru.praktikum.mainservice.client.StatClient;
 import ru.praktikum.mainservice.event.enums.StateEnum;
 import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.Event;
 import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
-import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
 import ru.praktikum.mainservice.event.model.dto.NewEventDto;
 import ru.praktikum.mainservice.event.repository.EventStorage;
@@ -28,7 +29,6 @@ import ru.praktikum.mainservice.user.service.UserService;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -41,6 +41,7 @@ public class EventServiceImpl implements EventService {
     private final UserService userService;
     private final CategoryService categoryService;
     private final RequestStorage requestStorage;
+    private final StatClient statClient;
 
     /*
     POST EVENT - Добавление нового события:
@@ -307,12 +308,42 @@ public class EventServiceImpl implements EventService {
             информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
      */
     @Override
-    public List<EventShortDto> getAllPublicEvents(EventPublicFilterDto dto,
+    public List<EventShortDto> getAllPublicEvents(String text,
+                                                  List<Long> categories,
+                                                  Boolean paid,
+                                                  String rangeStart,
+                                                  String rangeEnd,
+                                                  String sort,
                                                   Integer from,
                                                   Integer size) {
 
+        // Создаем переменные для LocalDateTime;
+        LocalDateTime start;
+        LocalDateTime end;
+
+        // Проверяем входящие параметры времени;
+        if (rangeStart == null || rangeEnd == null) {
+            start = LocalDateTime.now();
+            end = LocalDateTime.MAX;
+        } else {
+            start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
+            end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+        }
+
         // Собираем все события согласно переданным параметрам;
-        List<Event> events = eventStorage.findAllEventsByFilterParams(dto, PageRequest.of(from / size, size));
+        List<Event> events = eventStorage.findAllPublicEvents(
+                        text,
+                        categories,
+                        paid,
+                        start,
+                        end,
+                        PageRequest.of(from / size, size))
+                .stream().toList();
+
+        // Проверяем, что данные были найдены;
+        if (events.isEmpty()) {
+            throw new BadRequestException("По заданным параметрам события не найдены!");
+        }
 
         // Создаем результирующий объект;
         List<EventShortDto> result = new ArrayList<>();
@@ -325,10 +356,6 @@ public class EventServiceImpl implements EventService {
             result.add(EventMapper.fromFullDtoToShortDto(eventFullDto));
         }
 
-        // Сортируем результат, по умолчанию будет сортировка по EVENT_DATE;
-        if (dto.getSort().equals("VIEWS")) {
-            result.sort(Comparator.comparing(EventShortDto::getViews));
-        }
         log.info("Выводим все публичные события всего: {}", result.size());
         return result;
     }
@@ -354,9 +381,6 @@ public class EventServiceImpl implements EventService {
         // Проверяем количество подтвержденных запросов и сетим их в результат;
         result.setConfirmedRequests(getConfirmedRequests(eventId));
 
-        // TODO Тут нужно будет засетить количество просмотров
-        // TODO И сохранить информацию о вызове этого метода в сервисе статистики
-
         log.info("Выводим публичное событие: {}", result);
         return result;
     }
@@ -374,14 +398,13 @@ public class EventServiceImpl implements EventService {
                                            Integer from,
                                            Integer size) {
 
-        // TODO Я так понимаю, что тут нужно применить предикаты;
         // Создаем из стрингов LocalDateTime;
         LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
         LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
 
         // Сначала находим список EventState по указанным параметрам, так как там лежат state;
         List<Event> events =
-                eventStorage.findAllByInitiator_IdInAndCategory_IdInAndEventDateBetweenAndStateIn(
+                eventStorage.findEventsByAdminSearch(
                                 Arrays.stream(users).toList(),
                                 Arrays.stream(categories).toList(),
                                 start,

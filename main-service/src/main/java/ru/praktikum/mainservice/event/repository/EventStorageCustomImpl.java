@@ -44,7 +44,7 @@ public class EventStorageCustomImpl implements EventStorageCustom {
         if (dto.getSort().equals("EVENT_DATE")) {
             query.orderBy(cb.desc(event.get("eventDate")));
         } else if (dto.getSort().equals("VIEWS")) {
-            query.orderBy(cb.desc(event.get("views")));
+            query.orderBy(cb.asc(event.get("eventDate")));
         }
 
         TypedQuery<Event> typedQuery = entityManager.createQuery(query);

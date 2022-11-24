@@ -64,5 +64,5 @@ public class EventFullDto {
     private String title;
 
     @JsonProperty("views")
-    private Long views;
+    private Integer views;
 }

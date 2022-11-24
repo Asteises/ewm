@@ -3,7 +3,9 @@ package ru.praktikum.mainservice.client;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
+import org.springframework.lang.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import ru.praktikum.mainservice.client.dto.EndpointHitDto;
@@ -11,6 +13,9 @@ import ru.praktikum.mainservice.event.mapper.EventMapper;
 
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @Service
@@ -35,11 +40,35 @@ public class StatClient extends BaseClient {
         endpointHitDto.setIp(httpServletRequest.getRemoteAddr());
         endpointHitDto.setTimestamp(LocalDateTime.now().format(EventMapper.FORMATTER_EVENT_DATE));
 
-        post("/stats/hit", endpointHitDto);
+        post("/hit", endpointHitDto);
     }
 
-    public Long getViews(long eventId) {
+    public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, @Nullable Boolean unique) {
 
-        return (Long) get("/stats/" + eventId).getBody();
+        Map<String, Object> parametrs = Map.of(
+                "start",start.format(EventMapper.FORMATTER_EVENT_DATE),
+                "end", end.format(EventMapper.FORMATTER_EVENT_DATE),
+                "uri", uris,
+                "unique", unique
+        );
+
+        log.info("uris={}", uris);
+        return get("/stats", parametrs);
     }
+
+    // TODO Как вернуть что-то кроме Object или преобразовать его в нужный нам объект?
+    public Integer getStatsByEventId(long eventId) {
+        String path = "/stats/" + eventId;
+
+        Map<String, Object> parametrs = Map.of(
+                "start",LocalDateTime.MIN,
+                "end", LocalDateTime.now(),
+                "uri", path,
+                "unique", false
+        );
+
+        log.info("Получаем статистику просмотров для eventId={}", eventId);
+        return getInteger(path, parametrs);
+    }
+
 }

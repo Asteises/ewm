@@ -13,7 +13,7 @@ import org.springframework.validation.annotation.Validated;
 public class EndpointHitDto {
 
     @JsonProperty("app")
-    private String app = "ewm-main-service";
+    private String app = "main-service";
 
     @JsonProperty("uri")
     private String uri;

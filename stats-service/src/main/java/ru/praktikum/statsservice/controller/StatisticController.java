@@ -7,6 +7,7 @@ import ru.praktikum.statsservice.service.StatService;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;
 import ru.praktikum.statsservice.model.dto.ViewStatsDto;
 
+import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -19,14 +20,14 @@ public class StatisticController {
 
     /*
     POST - Сохранение информации о том, что к эндпоинту был запрос
-        Сохранение информации о том, что на uri конкретного сервиса был отправлен запрос пользователем.
+        + Сохранение информации о том, что на uri конкретного сервиса был отправлен запрос пользователем.
         Название сервиса, uri и ip пользователя указаны в теле запроса.
      */
     @PostMapping("/hit")
     public void saveRequestInfo(@RequestBody EndpointHitDto endpointHitDto) {
 
-        log.info("Сохранение информации о том, что к эндпоинту uri={} был запрос: app={}",
-                endpointHitDto.getUri(), endpointHitDto.getApp());
+        log.info("Сохранение информации о том, что к эндпоинту uri={} был запрос",
+                endpointHitDto.getUri());
         statService.save(endpointHitDto);
     }
 
@@ -42,15 +43,15 @@ public class StatisticController {
 
         log.info("Получаем статистику на события: uris={} с параметрами start={}, end={}, unique={}",
                 uris, start, end, unique);
-
-
-        return null;
+        return statService.getEventsStatInfo(start, end, Arrays.stream(uris).toList(), unique);
     }
 
     @GetMapping("/stats/{eventId}")
-    public Integer getEventStatInfo(@PathVariable long eventId) {
+    public Integer getViewsByEventId(@PathVariable long eventId,
+                                     @RequestParam String start,
+                                     @RequestParam String end) {
 
-        log.info("Получаем статистику на событие: eventId={}", eventId);
-        return statService.getEventStatInfo(eventId);
+        log.info("Получаем статистику просмотров для: eventId={}", eventId);
+        return statService.findAllByUri("/stats/" + eventId, start, end);
     }
 }
