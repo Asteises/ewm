@@ -69,8 +69,10 @@ public class EventAdminController {
         for (EventFullDto eventFullDto : result) {
             uris.add("/stats/" + eventFullDto.getId());
         }
-        ResponseEntity<Object> response = statClient.getStats(dates.get("start"), dates.get("end"), uris, null);
+
+        ResponseEntity<Object> response = statClient.getStats(dates.get("start"), dates.get("end"), uris, false);
         log.info("Пришел объект: response={}", response);
+
 //        for (EventFullDto eventFullDto : result) {
 //            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId()).getBody();
 //            eventFullDto.setViews(views);

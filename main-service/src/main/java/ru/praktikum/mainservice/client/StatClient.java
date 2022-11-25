@@ -42,7 +42,7 @@ public class StatClient extends BaseClient {
         post("/hit", endpointHitDto);
     }
 
-    public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, @Nullable Boolean unique) {
+    public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
 
         Map<String, Object> parametrs = Map.of(
                 "start", start.format(EventMapper.FORMATTER_EVENT_DATE),
@@ -52,7 +52,10 @@ public class StatClient extends BaseClient {
         );
 
         log.info("uris={}", uris);
-        return get("/stats/", parametrs);
+
+        ResponseEntity<Object> response = get("/stats", parametrs);
+        log.info("response={}", response);
+        return response;
     }
 
     public ResponseEntity<Object> getStatsByEventId(long eventId) {
