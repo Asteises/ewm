@@ -16,8 +16,8 @@ import org.springframework.validation.annotation.Validated;
 @AllArgsConstructor
 public class NewUserRequest {
     @JsonProperty("email")
-    private String email = null;
+    private String email;
 
     @JsonProperty("name")
-    private String name = null;
+    private String name;
 }

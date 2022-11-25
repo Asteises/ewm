@@ -9,6 +9,7 @@ import java.util.Optional;
 
 @Repository
 public interface RequestStorage extends JpaRepository<Request, Long> {
+
     List<Request> findAllByRequester_Id(long requesterId);
 
     List<Request> findAllByEvent_Id(long eventId);

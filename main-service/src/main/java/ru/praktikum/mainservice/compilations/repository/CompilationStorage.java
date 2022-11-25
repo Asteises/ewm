@@ -10,4 +10,6 @@ import ru.praktikum.mainservice.compilations.model.Compilation;
 public interface CompilationStorage extends JpaRepository<Compilation, Long> {
 
     Page<Compilation> findAllByPinned(Boolean pinned, Pageable pageable);
+
+    Page<Compilation> findAll(Pageable pageable);
 }

@@ -11,13 +11,16 @@ import ru.praktikum.mainservice.category.model.dto.NewCategoryDto;
 public class CategoryMapper {
 
     public static Category newCategoryDtoToCategory(NewCategoryDto newCategoryDto) {
+
         Category category = new Category();
         category.setName(newCategoryDto.getName());
+
         log.info("Маппим NewCategoryDto в Category");
         return category;
     }
 
     public static CategoryDto categoryToCategoryDto(Category category) {
+
         log.info("Маппим Category в CategoryDto");
         return new CategoryDto(category.getId(), category.getName());
     }

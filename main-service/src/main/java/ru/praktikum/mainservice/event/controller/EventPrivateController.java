@@ -25,7 +25,7 @@ public class EventPrivateController {
     /*
     POST EVENT - Добавление нового события:
         Обратите внимание:
-            дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
+            + дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
     */
     @PostMapping("/{userId}/events")
     public EventFullDto createEvent(@PathVariable long userId,
@@ -38,9 +38,9 @@ public class EventPrivateController {
     /*
     PATCH EVENT - Изменение события добавленного текущим пользователем:
         Обратите внимание:
-            изменить можно только отмененные события или события в состоянии ожидания модерации;
-            если редактируется отменённое событие, то оно автоматически переходит в состояние ожидания модерации;
-            дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
+            + изменить можно только отмененные события или события в состоянии ожидания модерации;
+            + если редактируется отменённое событие, то оно автоматически переходит в состояние ожидания модерации;
+            + дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
     */
     @PatchMapping("/{userId}/events")
     public EventFullDto updateEventByCurrentUser(@PathVariable long userId,
@@ -68,6 +68,7 @@ public class EventPrivateController {
     @GetMapping("/{userId}/events/{eventId}")
     public EventFullDto getEventByIdByCurrentUser(@PathVariable long userId,
                                                   @PathVariable long eventId) {
+
         log.info("Пользователь userId={} получает свое событие eventId={}", userId, eventId);
         return eventService.getEventByIdByCurrentUser(userId, eventId);
     }
@@ -75,11 +76,12 @@ public class EventPrivateController {
     /*
     PATCH EVENT - Отмена события добавленного текущим пользователем:
         Обратите внимание:
-            Отменить можно только событие в состоянии ожидания модерации;
+            + Отменить можно только событие в состоянии ожидания модерации;
      */
     @PatchMapping("/{userId}/events/{eventId}")
     public EventFullDto cancelEventByCurrentUser(@PathVariable long userId,
                                                  @PathVariable long eventId) {
+
         log.info("Пользователь userId={} отменяет свое событие eventId={}", userId, eventId);
         return eventService.cancelEventByCurrentUser(userId, eventId);
     }
@@ -90,6 +92,7 @@ public class EventPrivateController {
     @GetMapping("/{userId}/events/{eventId}/requests")
     public List<ParticipationRequestDto> getRequestsByEventByCurrentUser(@PathVariable long userId,
                                                                          @PathVariable long eventId) {
+
         log.info("Пользователь userId={} получает все запросы на свое событие eventId={}", userId, eventId);
         return eventService.getRequestsByEventByCurrentUser(userId, eventId);
     }
@@ -97,14 +100,15 @@ public class EventPrivateController {
     /*
     PATCH EVENT - Подтверждение чужой заявки на участие в событии текущего пользователя:
         Обратите внимание:
-            если для события лимит заявок равен 0 или отключена пре-модерация заявок, то подтверждение заявок не требуется;
-            нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие;
-            если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить;
+            + если для события лимит заявок равен 0 или отключена пре-модерация заявок, то подтверждение заявок не требуется;
+            + нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие;
+            + если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить;
      */
     @PatchMapping("/{userId}/events/{eventId}/requests/{reqId}/confirm")
     public ParticipationRequestDto acceptRequestOnEventByCurrentUser(@PathVariable long userId,
                                                                      @PathVariable long eventId,
                                                                      @PathVariable long reqId) {
+
         log.info("Пользователь userId={} одобряет чужой запрос reqId={} на участие свое событие eventId={}",
                 userId, reqId, eventId);
         return eventService.acceptRequestOnEventByCurrentUser(userId, eventId, reqId);
@@ -117,6 +121,7 @@ public class EventPrivateController {
     public ParticipationRequestDto cancelRequestOnEventByCurrentUser(@PathVariable long userId,
                                                                      @PathVariable long eventId,
                                                                      @PathVariable long reqId) {
+
         log.info("Пользователь userId={} одобряет чужой запрос reqId={} на участие свое событие eventId={}",
                 userId, reqId, eventId);
         return eventService.cancelRequestOnEventByCurrentUser(userId, eventId, reqId);

@@ -4,14 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.praktikum.mainservice.category.mapper.CategoryMapper;
 import ru.praktikum.mainservice.category.model.Category;
 import ru.praktikum.mainservice.category.model.dto.CategoryDto;
 import ru.praktikum.mainservice.category.model.dto.NewCategoryDto;
 import ru.praktikum.mainservice.category.repository.CategoryStorage;
 import ru.praktikum.mainservice.event.repository.EventStorage;
-import ru.praktikum.mainservice.exception.ApiError;
 import ru.praktikum.mainservice.exception.BadRequestException;
 import ru.praktikum.mainservice.exception.ConflictException;
 import ru.praktikum.mainservice.exception.NotFoundException;
@@ -84,7 +82,7 @@ public class CategoryServiceImpl implements CategoryService {
 
         // Проверяем есть ли связанные с категорией события;
         if (eventStorage.findEventByCategory_Id(catId).isPresent()) {
-            throw  new BadRequestException("Категорию нельзя удалить, так как есть связанные с ней события");
+            throw new BadRequestException("Категорию нельзя удалить, так как есть связанные с ней события");
         }
 
         log.info("Категория удалена: category={}", category.toString());
@@ -125,12 +123,15 @@ public class CategoryServiceImpl implements CategoryService {
                 .orElseThrow(() -> new NotFoundException(String.format("Категория не найдена: categoryId=%s", catId)));
     }
 
+    /*
+    Метод проверяет уникальность имени категории;
+     */
     private void checkNameCategory(String catName) {
 
         log.info("Проверяем уникальность имени категории catName={}", catName);
 
         if (categoryStorage.findCategoryByName(catName).isPresent()) {
-            log.info("Категория существует!");
+            log.info("Категория с таким именем уже существует!");
             throw new ConflictException(String.format("Категория с таким именем catName=%s уже существует", catName));
         }
     }

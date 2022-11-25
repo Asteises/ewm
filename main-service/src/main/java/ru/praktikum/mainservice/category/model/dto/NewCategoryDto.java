@@ -22,5 +22,5 @@ public class NewCategoryDto {
     @JsonProperty("name")
     @NotNull
     @NotBlank
-    private String name = null;
+    private String name;
 }

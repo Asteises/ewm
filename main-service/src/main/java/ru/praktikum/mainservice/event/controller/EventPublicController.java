@@ -2,21 +2,21 @@ package ru.praktikum.mainservice.event.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.ResponseEntity;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
 import ru.praktikum.mainservice.client.StatClient;
-import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
 import ru.praktikum.mainservice.event.service.EventService;
+import ru.praktikum.mainservice.event.utils.EventFilterValidDates;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -26,6 +26,7 @@ public class EventPublicController {
 
     private final EventService eventService;
     private final StatClient statClient;
+    private final EventFilterValidDates eventFilterValidDates;
 
     // TODO
     /*
@@ -33,28 +34,28 @@ public class EventPublicController {
         Обратите внимание:
             + это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события;
             + текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв;
-            если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени;
-            информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие;
-            информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
+            + если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени;
+            + информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие;
+            + информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
      */
     @GetMapping()
-    public List<EventShortDto> getAllPublicEvents(@RequestParam String text,
-                                                  @RequestParam Long[] categories,
-                                                  @RequestParam Boolean paid,
-                                                  @RequestParam String rangeStart,
-                                                  @RequestParam String rangeEnd,
-                                                  @RequestParam(defaultValue = "false") Boolean onlyAvailable,
-                                                  @RequestParam String sort, // Вариант сортировки: по дате события или по количеству просмотров Available values : EVENT_DATE, VIEWS
+    public List<EventShortDto> getAllPublicEvents(@RequestParam @Nullable String text,
+                                                  @RequestParam @Nullable List<Long> categories,
+                                                  @RequestParam(defaultValue = "false") @Nullable Boolean paid,
+                                                  @RequestParam @Nullable String rangeStart,
+                                                  @RequestParam @Nullable String rangeEnd,
+                                                  @RequestParam(defaultValue = "false") @Nullable Boolean onlyAvailable,
+                                                  @RequestParam(defaultValue = "EVENT_DATE") @Nullable String sort, // Вариант сортировки: по дате события или по количеству просмотров Available values : EVENT_DATE, VIEWS
                                                   @PositiveOrZero @RequestParam(defaultValue = "0") Integer from,
                                                   @Positive @RequestParam(defaultValue = "10") Integer size,
                                                   HttpServletRequest request) {
 
-        log.info("Получаем все события с учетом фильтрации: text={}, categories={}, paid={}, rangeStart={}, " +
-                        "rangeEnd={}, onlyAvailable={}, sort={}, from={}, size={}",
-                text, categories, paid, rangeStart, rangeEnd, onlyAvailable, sort, from, size);
+        // Валидируем время;
+        Map<String, LocalDateTime> dates = eventFilterValidDates.checkAndFormat(rangeStart, rangeEnd);
 
-        LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
-        LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+        log.info("Получаем все события с учетом фильтрации: text={}, categories={}, paid={}, start={}, " +
+                        "end={}, onlyAvailable={}, sort={}, from={}, size={}",
+                text, categories, paid, dates.get("start"), dates.get("end"), onlyAvailable, sort, from, size);
 
         // Информация для сервиса статистики;
         log.info("client ip: {}", request.getRemoteAddr());
@@ -63,19 +64,19 @@ public class EventPublicController {
 
         List<EventShortDto> result = eventService.getAllPublicEvents(
                 text,
-                Arrays.stream(categories).toList(),
+                categories,
                 paid,
-                rangeStart,
-                rangeEnd,
+                dates.get("start"),
+                dates.get("end"),
                 sort,
                 from,
                 size);
 
-        for (EventShortDto eventShortDto : result) {
-            Object o = statClient.getStatsByEventId(eventShortDto.getId());
-            Integer views = (Integer) o;
-            eventShortDto.setViews(views);
-        }
+//        for (EventShortDto eventShortDto : result) {
+//            Object o = statClient.getStatsByEventId(eventShortDto.getId());
+//            Integer views = (Integer) o;
+//            eventShortDto.setViews(views);
+//        }
         return result;
     }
 
@@ -90,17 +91,17 @@ public class EventPublicController {
     public EventFullDto getPublicEventById(@PathVariable long id,
                                            HttpServletRequest request) {
 
-        log.info("Получаем событие: id={}", id);
+        log.info("Получаем событие: eventId={}", id);
 
         // Информация для сервиса статистики;
         log.info("client ip: {}", request.getRemoteAddr());
         log.info("endpoint path: {}", request.getRequestURI());
         statClient.saveRequestInfo(request);
 
-        Integer views = (Integer) statClient.getStatsByEventId(id).getBody();
+//        Integer views = (Integer) statClient.getStatsByEventId(id).getBody();
 
         EventFullDto eventFullDto = eventService.getPublicEventById(id);
-        eventFullDto.setViews(views);
+//        eventFullDto.setViews(views);
 
         return eventFullDto;
     }

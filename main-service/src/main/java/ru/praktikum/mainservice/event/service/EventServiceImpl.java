@@ -3,7 +3,6 @@ package ru.praktikum.mainservice.event.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import ru.praktikum.mainservice.category.model.Category;
 import ru.praktikum.mainservice.category.service.CategoryService;
@@ -28,7 +27,6 @@ import ru.praktikum.mainservice.user.service.UserService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -46,10 +44,17 @@ public class EventServiceImpl implements EventService {
     /*
     POST EVENT - Добавление нового события:
         Обратите внимание:
-            дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
+            + дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента;
     */
     @Override
     public EventFullDto createEvent(long userId, NewEventDto newEventDto) {
+
+        // Создаем переменную времени события;
+        LocalDateTime eventDate = LocalDateTime.parse(newEventDto.getEventDate(), (EventMapper.FORMATTER_EVENT_DATE));
+
+        // Валидируем время события;
+        checkEventCreateDate(eventDate);
+
         /*
         Из контроллера приходит только id пользователя,
         а положить в Event нужно всего пользователя, дополнительно проверяем наличие пользователя в БД;
@@ -78,12 +83,19 @@ public class EventServiceImpl implements EventService {
     /*
     PATCH EVENT - Изменение события добавленного текущим пользователем:
         Обратите внимание:
-            изменить можно только отмененные события или события в состоянии ожидания модерации
-            если редактируется отменённое событие, то оно автоматически переходит в состояние ожидания модерации
-            дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента
+            + изменить можно только отмененные события или события в состоянии ожидания модерации
+            + если редактируется отменённое событие, то оно автоматически переходит в состояние ожидания модерации
+            + дата и время на которые намечено событие не может быть раньше, чем через два часа от текущего момента
     */
     @Override
     public EventFullDto updateEventByCurrentUser(long userId, UpdateEventRequest updateEventRequest) {
+
+        // Создаем переменную времени события;
+        LocalDateTime eventDate = LocalDateTime.parse(updateEventRequest.getEventDate(), (EventMapper.FORMATTER_EVENT_DATE));
+
+        // Валидируем время события;
+        checkEventCreateDate(eventDate);
+
         /*
         Из контроллера приходит только id пользователя,
         а положить в Event нужно всего пользователя, дополнительно проверяем наличие пользователя в БД;
@@ -167,7 +179,7 @@ public class EventServiceImpl implements EventService {
     /*
     PATCH EVENT - Отмена события добавленного текущим пользователем:
         Обратите внимание:
-            Отменить можно только событие в состоянии ожидания модерации;
+            + Отменить можно только событие в состоянии ожидания модерации;
      */
     @Override
     public EventFullDto cancelEventByCurrentUser(long userId, long eventId) {
@@ -181,7 +193,7 @@ public class EventServiceImpl implements EventService {
         // Проверяем что событие принадлежит текущему пользователю;
         checkOwnEvent(event, user);
 
-        // Проверяем статус;
+        // Проверяем статус события;
         checkStatePending(event);
 
         // Сетим статус отмены и сохраняем в БД;
@@ -225,8 +237,8 @@ public class EventServiceImpl implements EventService {
     PATCH EVENT - Подтверждение чужой заявки на участие в событии текущего пользователя:
         Обратите внимание:
             + если для события лимит заявок равен 0 или отключена пре-модерация заявок, то подтверждение заявок не требуется;
-            нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие;
-            если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить;
+            + нельзя подтвердить заявку, если уже достигнут лимит по заявкам на данное событие;
+            + если при подтверждении данной заявки, лимит заявок для события исчерпан, то все неподтверждённые заявки необходимо отклонить;
      */
     @Override
     public ParticipationRequestDto acceptRequestOnEventByCurrentUser(long userId, long eventId, long reqId) {
@@ -303,32 +315,19 @@ public class EventServiceImpl implements EventService {
         Обратите внимание:
             + это публичный эндпоинт, соответственно в выдаче должны быть только опубликованные события;
             + текстовый поиск (по аннотации и подробному описанию) должен быть без учета регистра букв;
-            если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени;
-            информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие;
-            информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
+            + если в запросе не указан диапазон дат [rangeStart-rangeEnd], то нужно выгружать события, которые произойдут позже текущей даты и времени;
+            + информация о каждом событии должна включать в себя количество просмотров и количество уже одобренных заявок на участие;
+            + информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
      */
     @Override
     public List<EventShortDto> getAllPublicEvents(String text,
                                                   List<Long> categories,
                                                   Boolean paid,
-                                                  String rangeStart,
-                                                  String rangeEnd,
+                                                  LocalDateTime start,
+                                                  LocalDateTime end,
                                                   String sort,
                                                   Integer from,
                                                   Integer size) {
-
-        // Создаем переменные для LocalDateTime;
-        LocalDateTime start;
-        LocalDateTime end;
-
-        // Проверяем входящие параметры времени;
-        if (rangeStart == null || rangeEnd == null) {
-            start = LocalDateTime.now();
-            end = LocalDateTime.MAX;
-        } else {
-            start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
-            end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
-        }
 
         // Собираем все события согласно переданным параметрам;
         List<Event> events = eventStorage.findAllPublicEvents(
@@ -364,8 +363,8 @@ public class EventServiceImpl implements EventService {
     Получение подробной информации об опубликованном событии по его идентификатору
         Обратите внимание:
             + событие должно быть опубликовано;
-            -+ информация о событии должна включать в себя количество просмотров и количество подтвержденных запросов;
-            - информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
+            + информация о событии должна включать в себя количество просмотров и количество подтвержденных запросов;
+            + информацию о том, что по этому эндпоинту был осуществлен и обработан запрос, нужно сохранить в сервисе статистики;
      */
     @Override
     public EventFullDto getPublicEventById(long eventId) {
@@ -390,33 +389,34 @@ public class EventServiceImpl implements EventService {
         Эндпоинт возвращает полную информацию обо всех событиях подходящих под переданные условия;
     */
     @Override
-    public List<EventFullDto> searchEvents(Long[] users,
-                                           String[] states,
-                                           Long[] categories,
-                                           String rangeStart,
-                                           String rangeEnd,
+    public List<EventFullDto> searchEvents(List<Long> users,
+                                           List<String> states,
+                                           List<Long> categories,
+                                           LocalDateTime start,
+                                           LocalDateTime end,
                                            Integer from,
                                            Integer size) {
-
-        // Создаем из стрингов LocalDateTime;
-        LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
-        LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
 
         // Сначала находим список EventState по указанным параметрам, так как там лежат state;
         List<Event> events =
                 eventStorage.findEventsByAdminSearch(
-                                Arrays.stream(users).toList(),
-                                Arrays.stream(categories).toList(),
+                                users,
+                                states,
+                                categories,
                                 start,
                                 end,
-                                Arrays.stream(states).toList(),
                                 PageRequest.of(from / size, size))
                         .stream().toList();
 
         log.info("Выводим список событий: events.size={}", events.size());
+        log.info("Найденные события: events={}", events);
         return events.stream().map(EventMapper::fromEventToEventFullDto).collect(Collectors.toList());
     }
 
+    /*
+    PUT EVENT ADMIN - Редактирование события.
+        Редактирование данных любого события администратором. Валидация данных не требуется;
+    */
     @Override
     public EventFullDto updateEventByAdmin(long eventId, AdminUpdateEventRequest adminUpdateEventRequest) {
 
@@ -464,7 +464,7 @@ public class EventServiceImpl implements EventService {
         // Возвращаемый объект;
         EventFullDto result = EventMapper.fromEventToEventFullDto(currentEvent);
 
-        log.info("Админ одобрил событие eventId={} теперь оно опубликовано eventStatus={}:", eventId, currentEvent.getState());
+        log.info("Админ одобрил событие eventId={} теперь оно опубликовано: eventStatus={}", eventId, currentEvent.getState());
         return result;
     }
 
@@ -570,6 +570,25 @@ public class EventServiceImpl implements EventService {
                     .format("Событие не может быть опубликовано, так как дата начала eventDate=%s менее чем через" +
                             " час после даты публикации publishedOn=%s", eventDate, publishedOn));
         }
+    }
+
+    /*
+    Метод проверяет, чтобы событие создано было не ранее чем за два часа до начала;
+     */
+    private void checkEventCreateDate(LocalDateTime eventDate) {
+
+        log.info("Проверяем дату события: eventDate={}", eventDate);
+        if (eventDate.isBefore(LocalDateTime.now().plusHours(2))) {
+            throw new BadRequestException(String.format("Событие не может быть раньше, чем через два часа от текущего момента: eventDate=%s", eventDate));
+        }
+    }
+
+    private Integer getViewsByEventId(long eventId) {
+
+        Integer views = (Integer) statClient.getStatsByEventId(eventId).getBody();
+
+        log.info("Получаем просмотры события eventId={}: views={}", eventId, views);
+        return views;
     }
 
     /*

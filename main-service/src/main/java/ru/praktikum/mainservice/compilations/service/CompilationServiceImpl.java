@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import ru.praktikum.mainservice.compilations.mapper.CompilationMapper;
 import ru.praktikum.mainservice.compilations.model.Compilation;
 import ru.praktikum.mainservice.compilations.model.CompilationEvent;
@@ -40,11 +39,21 @@ public class CompilationServiceImpl implements CompilationService {
     @Override
     public List<CompilationDto> getAllCompilations(Boolean pinned, Integer from, Integer size) {
 
-        // Собираем лист всех подборок по заданным параметрам;
-        List<Compilation> compilations = compilationStorage
-                .findAllByPinned(pinned, PageRequest.of(from / size, size))
-                .stream()
-                .toList();
+        List<Compilation> compilations;
+
+        // Проверяем все ли параметры пришли;
+        if (pinned != null) {
+            // Если да, то собираем лист всех подборок по заданным параметрам;
+            compilations = compilationStorage
+                    .findAllByPinned(pinned, PageRequest.of(from / size, size))
+                    .stream()
+                    .toList();
+        } else {
+            // Если нет, то собираем все что есть в БД;
+            compilations = compilationStorage.findAll(PageRequest.of(from / size, size))
+                    .stream()
+                    .toList();
+        }
 
         // Создаем результирующий объект;
         List<CompilationDto> result = new ArrayList<>();
@@ -208,6 +217,7 @@ public class CompilationServiceImpl implements CompilationService {
 
         // Открепляем;
         compilation.setPinned(false);
+
         log.info("Открепили подборку compId={} : {}", compId, compilation.getPinned());
         compilationStorage.save(compilation);
     }
@@ -223,6 +233,7 @@ public class CompilationServiceImpl implements CompilationService {
 
         // Прикрепляем;
         compilation.setPinned(true);
+
         log.info("Закрепили подборку compId={} : {}", compId, compilation.getPinned());
         compilationStorage.save(compilation);
     }

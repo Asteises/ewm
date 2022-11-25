@@ -2,18 +2,19 @@ package ru.praktikum.mainservice.event.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
 import ru.praktikum.mainservice.client.StatClient;
-import ru.praktikum.mainservice.event.mapper.EventMapper;
 import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
 import ru.praktikum.mainservice.event.service.EventService;
+import ru.praktikum.mainservice.event.utils.EventFilterValidDates;
 
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Slf4j
 @RestController
@@ -22,34 +23,33 @@ import java.util.List;
 public class EventAdminController {
 
     private final EventService eventService;
+    private final EventFilterValidDates eventFilterValidDates;
 
     private final StatClient statClient;
 
-    // TODO
     /*
     GET EVENT ADMIN - Поиск событий.
         Эндпоинт возвращает полную информацию обо всех событиях подходящих под переданные условия;
      */
     @GetMapping
-    public List<EventFullDto> searchEvents(@RequestParam Long[] users,
-                                           @RequestParam String[] states,
-                                           @RequestParam Long[] categories,
-                                           @RequestParam String rangeStart,
-                                           @RequestParam String rangeEnd,
+    public List<EventFullDto> searchEvents(@RequestParam @Nullable List<Long> users,
+                                           @RequestParam @Nullable List<String> states,
+                                           @RequestParam @Nullable List<Long> categories,
+                                           @RequestParam @Nullable String rangeStart,
+                                           @RequestParam @Nullable String rangeEnd,
                                            @PositiveOrZero @RequestParam(defaultValue = "0") Integer from,
                                            @Positive @RequestParam(defaultValue = "10") Integer size) {
 
-
-        LocalDateTime start = LocalDateTime.parse(rangeStart, EventMapper.FORMATTER_EVENT_DATE);
-        LocalDateTime end = LocalDateTime.parse(rangeEnd, EventMapper.FORMATTER_EVENT_DATE);
+        // Создаем переменные для валидации даты и времени;
+        Map<String, LocalDateTime> dates = eventFilterValidDates.checkAndFormat(rangeStart, rangeEnd);
 
         log.info("Получаем все события с учетом параметров: users={}, states={}, categories={}, " +
-                        "rangeStart={}, rangeEnd={}, from={}, size={}",
-                Arrays.toString(users),
-                Arrays.toString(states),
-                Arrays.toString(categories),
-                rangeStart,
-                rangeEnd,
+                        "start={}, end={}, from={}, size={}",
+                users,
+                states,
+                categories,
+                dates.get("start"),
+                dates.get("end"),
                 from,
                 size);
 
@@ -57,15 +57,17 @@ public class EventAdminController {
                 users,
                 states,
                 categories,
-                rangeStart,
-                rangeEnd,
+                dates.get("start"),
+                dates.get("end"),
                 from,
                 size);
 
-        for (EventFullDto eventFullDto : result) {
-            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId()).getBody();
-            eventFullDto.setViews(views);
-        }
+        // TODO Получить из сервиса статистики информацию о просмотрах каждого события;
+
+//        for (EventFullDto eventFullDto : result) {
+//            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId()).getBody();
+//            eventFullDto.setViews(views);
+//        }
 
         return result;
     }

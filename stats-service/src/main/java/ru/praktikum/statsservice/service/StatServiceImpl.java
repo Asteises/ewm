@@ -25,6 +25,11 @@ public class StatServiceImpl implements StatService {
 
     public static final DateTimeFormatter FORMATTER_EVENT_DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
+    /*
+    POST - Сохранение информации о том, что к эндпоинту был запрос
+        + Сохранение информации о том, что на uri конкретного сервиса был отправлен запрос пользователем.
+        + Название сервиса, uri и ip пользователя указаны в теле запроса.
+    */
     @Override
     public void save(EndpointHitDto endpointHitDto) {
 
@@ -79,7 +84,7 @@ public class StatServiceImpl implements StatService {
             }
 
             // Сетим количество просмотров;
-            viewStatsDto.setHits((Integer) endpointHits.size());
+            viewStatsDto.setHits(endpointHits.size());
         }
 
         log.info("Получаем ViewStats={}", viewStatsDtos);

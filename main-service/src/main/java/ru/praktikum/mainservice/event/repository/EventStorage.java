@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface EventStorage extends JpaRepository<Event, Long>, EventStorageCustom {
+public interface EventStorage extends JpaRepository<Event, Long> {
 
     Page<Event> findEventByInitiator_Id(long userId, Pageable pageable);
 
@@ -27,7 +27,7 @@ public interface EventStorage extends JpaRepository<Event, Long>, EventStorageCu
             "and ((:categories) is null or e.category.id in :categories)" +
             "and ((:paid) is null or e.paid = :paid)" +
             "and (e.eventDate >= :start)" +
-            "and (e.eventDate <= :end)")
+            "and (e.eventDate < :end)")
     Page<Event> findAllPublicEvents(
             String text,
             List<Long> categories,
@@ -36,25 +36,17 @@ public interface EventStorage extends JpaRepository<Event, Long>, EventStorageCu
             LocalDateTime end,
             Pageable pageable);
 
-    @Query("SELECT e FROM Event AS e " +
-            "WHERE ((:users) IS NULL OR e.initiator.id IN :users) " +
-            "AND ((:states) IS NULL OR e.state IN :states) " +
-            "AND ((:categories) IS NULL OR e.category.id IN :categories) " +
-            "AND (e.eventDate >= :rangeStart) " +
-            "AND ( e.eventDate <= :rangeEnd)")
+    @Query("select e from Event as e " +
+            "where ((:users) is null or e.initiator.id in:users) " +
+            "and ((:states) is null or e.state in :states) " +
+            "and ((:categories) is null or e.category.id in :categories) " +
+            "and (e.eventDate >= :rangeStart) " +
+            "and (e.eventDate < :rangeEnd)")
     Page<Event> findEventsByAdminSearch(
             List<Long> users,
+            List<String> states,
             List<Long> categories,
             LocalDateTime rangeStart,
             LocalDateTime rangeEnd,
-            List<String> states,
-            Pageable pageable);
-
-    Page<Event> findAllByInitiator_IdInAndCategory_IdInAndEventDateBetweenAndStateIn(
-            List<Long> users,
-            List<Long> categories,
-            LocalDateTime rangeStart,
-            LocalDateTime rangeEnd,
-            List<String> states,
             Pageable pageable);
 }

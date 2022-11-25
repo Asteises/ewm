@@ -2,16 +2,15 @@ package ru.praktikum.mainservice.event.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.PathVariable;
-import ru.praktikum.mainservice.category.model.Category;
 import ru.praktikum.mainservice.event.model.Event;
 import ru.praktikum.mainservice.event.model.dto.AdminUpdateEventRequest;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
-import ru.praktikum.mainservice.event.model.dto.EventPublicFilterDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
 import ru.praktikum.mainservice.event.model.dto.NewEventDto;
 import ru.praktikum.mainservice.request.model.dto.ParticipationRequestDto;
 import ru.praktikum.mainservice.request.model.dto.UpdateEventRequest;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -36,8 +35,8 @@ public interface EventService {
     List<EventShortDto> getAllPublicEvents(String text,
                                            List<Long> categories,
                                            Boolean paid,
-                                           String rangeStart,
-                                           String rangeEnd,
+                                           LocalDateTime rangeStart,
+                                           LocalDateTime rangeEnd,
                                            String sort,
                                            Integer from,
                                            Integer size);
@@ -48,11 +47,11 @@ public interface EventService {
 
     Boolean checkRequestLimitAndModeration(Event event);
 
-    List<EventFullDto> searchEvents(Long[] users,
-                                    String[] states,
-                                    Long[] categories,
-                                    String rangeStart,
-                                    String rangeEnd,
+    List<EventFullDto> searchEvents(List<Long> users,
+                                    List<String> states,
+                                    List<Long> categories,
+                                    LocalDateTime start,
+                                    LocalDateTime end,
                                     Integer from,
                                     Integer size);
 

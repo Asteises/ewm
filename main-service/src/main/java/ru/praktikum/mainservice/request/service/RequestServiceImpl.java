@@ -82,6 +82,7 @@ public class RequestServiceImpl implements RequestService {
     */
     @Override
     public ParticipationRequestDto cancelOwnRequest(long userId, long requestId) {
+
         Request request = checkRequestAvailableInDb(requestId);
         request.setStatus(StateEnum.CANCELED.toString());
         requestStorage.save(request);
@@ -95,6 +96,7 @@ public class RequestServiceImpl implements RequestService {
     */
     @Override
     public List<ParticipationRequestDto> getRequests(long userId) {
+
         User user = userService.checkUserAvailableInDb(userId);
         List<Request> requests = requestStorage.findAllByRequester_Id(user.getId());
 
@@ -107,6 +109,7 @@ public class RequestServiceImpl implements RequestService {
      */
     @Override
     public Request checkRequestAvailableInDb(long requestId) {
+
         return requestStorage.findById(requestId)
                 .orElseThrow(() -> new NotFoundException(String
                         .format("Запрос с таким requestId=%s не найден", requestId)));
@@ -116,6 +119,7 @@ public class RequestServiceImpl implements RequestService {
     Метод проверяет что запрос создается впервые;
     */
     private void checkRepeatRequest(long eventId, long requesterId) {
+
         if (requestStorage.findRequestByEvent_IdAndRequester_Id(eventId, requesterId).isPresent()) {
             throw new BadRequestException(String.format("Повторный запрос от пользователя " +
                     "requesterId=%s на событие eventId=%s", requesterId, eventId));
@@ -126,6 +130,7 @@ public class RequestServiceImpl implements RequestService {
     Метод проверяет что реквестор не является инициатором события;
      */
     private void checkRequesterNotInitiator(Event event, User requester) {
+
         if (event.getInitiator().equals(requester)) {
             throw new BadRequestException(String.format("Запрос не может быть создан инициатором " +
                     "события requesterId=%s", requester.getId()));
