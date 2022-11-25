@@ -13,7 +13,6 @@ import ru.praktikum.mainservice.event.mapper.EventMapper;
 
 import javax.servlet.http.HttpServletRequest;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -46,7 +45,7 @@ public class StatClient extends BaseClient {
     public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, @Nullable Boolean unique) {
 
         Map<String, Object> parametrs = Map.of(
-                "start",start.format(EventMapper.FORMATTER_EVENT_DATE),
+                "start", start.format(EventMapper.FORMATTER_EVENT_DATE),
                 "end", end.format(EventMapper.FORMATTER_EVENT_DATE),
                 "uri", uris,
                 "unique", unique
@@ -60,7 +59,7 @@ public class StatClient extends BaseClient {
         String path = "/stats/" + eventId;
 
         Map<String, Object> parametrs = Map.of(
-                "start",LocalDateTime.MIN,
+                "start", LocalDateTime.MIN,
                 "end", LocalDateTime.now(),
                 "uri", path,
                 "unique", false

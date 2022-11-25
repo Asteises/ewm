@@ -384,6 +384,7 @@ public class EventServiceImpl implements EventService {
         return result;
     }
 
+    // TODO Получить из сервиса статистики информацию о просмотрах каждого события;
     /*
     GET EVENT ADMIN - Поиск событий
         Эндпоинт возвращает полную информацию обо всех событиях подходящих под переданные условия;

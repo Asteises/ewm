@@ -12,5 +12,7 @@ public interface StatStorage extends JpaRepository<EndpointHit, Long> {
 
     List<EndpointHit> findAllByCreatedBetween(LocalDateTime start, LocalDateTime end);
 
-    List<EndpointHit> findAllByUriAndCreatedBetween(String uri, LocalDateTime start, LocalDateTime end);
+    List<EndpointHit> findAllByUriContaining(String uri);
+
+    EndpointHit findById(long id);
 }

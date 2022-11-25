@@ -4,11 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import one.util.streamex.StreamEx;
 import org.springframework.stereotype.Service;
-import ru.praktikum.statsservice.model.dto.ViewStatsDto;
-import ru.praktikum.statsservice.repository.StatStorage;
 import ru.praktikum.statsservice.mapper.StatMapper;
 import ru.praktikum.statsservice.model.EndpointHit;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;
+import ru.praktikum.statsservice.model.dto.ViewStatsDto;
+import ru.praktikum.statsservice.repository.StatStorage;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -40,6 +40,11 @@ public class StatServiceImpl implements StatService {
         statStorage.save(endpointHit);
     }
 
+    /*
+    GET - Получение статистики по посещениям.
+        Обратите внимание:
+            значение даты и времени нужно закодировать (например используя java.net.URLEncoder.encode).
+     */
     @Override
     public List<ViewStatsDto> getEventsStatInfo(String start, String end, List<String> uris, Boolean unique) {
 
@@ -48,7 +53,7 @@ public class StatServiceImpl implements StatService {
         LocalDateTime currentEnd = LocalDateTime.parse(end, FORMATTER_EVENT_DATE);
 
         // Создаем результирующий объект;
-        List<ViewStatsDto> viewStatsDtos = new ArrayList<>();
+        List<ViewStatsDto> result = new ArrayList<>();
 
         // Если список uris пришел пустой, то запишем в него все uri которые есть в БД ля данного приложения в диапазоне времени;
         if (uris == null) {
@@ -63,7 +68,7 @@ public class StatServiceImpl implements StatService {
         List<EndpointHit> endpointHits;
 
         // Проходимся по списку uris, чтобы посчитать просмотры для каждого;
-        for (String uri: uris) {
+        for (String uri : uris) {
 
             // Создаем ViewStatsDto в который будем записывать данные;
             ViewStatsDto viewStatsDto = new ViewStatsDto();
@@ -72,7 +77,8 @@ public class StatServiceImpl implements StatService {
             viewStatsDto.setUri(uri);
 
             // Находим все EndpointHit по заданным параметрам;
-            endpointHits = statStorage.findAllByUriAndCreatedBetween(uri, currentStart, currentEnd);
+            endpointHits = statStorage.findAllByUriContaining(uri);
+            log.info("endpointHits={}", endpointHits);
 
             // Если нужны данные с уникальными ip, то сначала обновим лист endpointHits;
             if (unique) {
@@ -83,12 +89,16 @@ public class StatServiceImpl implements StatService {
                         .collect(Collectors.toList());
             }
 
-            // Сетим количество просмотров;
+            // Сетим количество просмотров и app;
             viewStatsDto.setHits(endpointHits.size());
+            viewStatsDto.setApp("main-service");
+
+            // Добавляем в результат;
+            result.add(viewStatsDto);
         }
 
-        log.info("Получаем ViewStats={}", viewStatsDtos);
-        return viewStatsDtos;
+        log.info("Получаем result={}", result);
+        return result;
     }
 
     @Override
@@ -98,7 +108,7 @@ public class StatServiceImpl implements StatService {
         LocalDateTime currentStart = LocalDateTime.parse(start, FORMATTER_EVENT_DATE);
         LocalDateTime currentEnd = LocalDateTime.parse(end, FORMATTER_EVENT_DATE);
 
-        Integer integer = statStorage.findAllByUriAndCreatedBetween(uri, currentStart, currentEnd).size();
+        Integer integer = statStorage.findAll().size();
         log.info("Получаем статистику просмотров: integer={}", integer);
         return integer;
     }

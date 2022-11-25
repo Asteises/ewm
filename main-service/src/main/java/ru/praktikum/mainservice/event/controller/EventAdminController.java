@@ -2,6 +2,7 @@ package ru.praktikum.mainservice.event.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.lang.Nullable;
 import org.springframework.web.bind.annotation.*;
 import ru.praktikum.mainservice.client.StatClient;
@@ -13,6 +14,7 @@ import ru.praktikum.mainservice.event.utils.EventFilterValidDates;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -63,7 +65,12 @@ public class EventAdminController {
                 size);
 
         // TODO Получить из сервиса статистики информацию о просмотрах каждого события;
-
+        List<String> uris = new ArrayList<>();
+        for (EventFullDto eventFullDto : result) {
+            uris.add("/stats/" + eventFullDto.getId());
+        }
+        ResponseEntity<Object> response = statClient.getStats(dates.get("start"), dates.get("end"), uris, null);
+        log.info("Пришел объект: response={}", response);
 //        for (EventFullDto eventFullDto : result) {
 //            Integer views = (Integer) statClient.getStatsByEventId(eventFullDto.getId()).getBody();
 //            eventFullDto.setViews(views);

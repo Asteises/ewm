@@ -3,11 +3,10 @@ package ru.praktikum.statsservice.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
-import ru.praktikum.statsservice.service.StatService;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;
 import ru.praktikum.statsservice.model.dto.ViewStatsDto;
+import ru.praktikum.statsservice.service.StatService;
 
-import java.util.Arrays;
 import java.util.List;
 
 @Slf4j
@@ -38,12 +37,12 @@ public class StatisticController {
     @GetMapping("/stats")
     public List<ViewStatsDto> getEventsStatInfo(@RequestParam String start,
                                                 @RequestParam String end,
-                                                @RequestParam String[] uris,
+                                                @RequestParam List<String> uris,
                                                 @RequestParam(defaultValue = "false") Boolean unique) {
 
         log.info("Получаем статистику на события: uris={} с параметрами start={}, end={}, unique={}",
                 uris, start, end, unique);
-        return statService.getEventsStatInfo(start, end, Arrays.stream(uris).toList(), unique);
+        return statService.getEventsStatInfo(start, end, uris, unique);
     }
 
     @GetMapping("/stats/{eventId}")
