@@ -65,7 +65,7 @@ public class StatServiceImpl implements StatService {
         }
 
         // Промежуточный лист EndpointHit для простоты восприятия;
-        List<EndpointHit> endpointHits;
+        List<EndpointHit> endpointHits = new ArrayList<>();
 
         // Проходимся по списку uris, чтобы посчитать просмотры для каждого;
         for (String uri : uris) {
@@ -77,7 +77,8 @@ public class StatServiceImpl implements StatService {
             viewStatsDto.setUri(uri);
 
             // Находим все EndpointHit по заданным параметрам;
-            endpointHits = statStorage.findAllByUriContaining(uri);
+            endpointHits = statStorage.findByUri(uri);
+            log.info("Ищем все EndpointHit по uri={}", uri);
             log.info("endpointHits={}", endpointHits);
 
             // Если нужны данные с уникальными ip, то сначала обновим лист endpointHits;
@@ -99,17 +100,5 @@ public class StatServiceImpl implements StatService {
 
         log.info("Получаем result={}", result);
         return result;
-    }
-
-    @Override
-    public Integer findAllByUri(String uri, String start, String end) {
-
-        // Парсим LocalDateTime из String;
-        LocalDateTime currentStart = LocalDateTime.parse(start, FORMATTER_EVENT_DATE);
-        LocalDateTime currentEnd = LocalDateTime.parse(end, FORMATTER_EVENT_DATE);
-
-        Integer integer = statStorage.findAll().size();
-        log.info("Получаем статистику просмотров: integer={}", integer);
-        return integer;
     }
 }

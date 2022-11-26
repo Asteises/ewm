@@ -5,8 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
-import org.springframework.lang.Nullable;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 import org.springframework.web.util.DefaultUriBuilderFactory;
 import ru.praktikum.mainservice.client.dto.EndpointHitDto;
 import ru.praktikum.mainservice.event.mapper.EventMapper;
@@ -17,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 @Slf4j
-@Service
+@Component
 public class StatClient extends BaseClient {
 
     //@Value("${ewm-stats-service.url}") String url,
@@ -39,21 +38,21 @@ public class StatClient extends BaseClient {
         endpointHitDto.setIp(httpServletRequest.getRemoteAddr());
         endpointHitDto.setTimestamp(LocalDateTime.now().format(EventMapper.FORMATTER_EVENT_DATE));
 
-        post("/hit", endpointHitDto);
+        ResponseEntity<Object> response = post("/hit", endpointHitDto);
     }
 
     public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
 
-        Map<String, Object> parametrs = Map.of(
+        Map<String, Object> parameters = Map.of(
                 "start", start.format(EventMapper.FORMATTER_EVENT_DATE),
                 "end", end.format(EventMapper.FORMATTER_EVENT_DATE),
-                "uri", uris,
+                "uris", uris,
                 "unique", unique
         );
 
-        log.info("uris={}", uris);
+        log.info("parameters={}", parameters);
 
-        ResponseEntity<Object> response = get("/stats", parametrs);
+        ResponseEntity<Object> response = get("/stats?start={start}&end={end}&uris={uris}&unique={unique}", parameters);
         log.info("response={}", response);
         return response;
     }

@@ -21,17 +21,22 @@ public class EndpointHit {
     @JsonProperty("id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Id
+    @Column(name = "id")
     private Long id;
 
     @JsonProperty("app")
+    @Column(name = "app")
     private String app;
 
     @JsonProperty("uri")
+    @Column(name = "uri")
     private String uri;
 
     @JsonProperty("ip")
+    @Column(name = "ip")
     private String ip;
 
     @JsonProperty("created")
+    @Column(name = "created")
     private LocalDateTime created;
 }

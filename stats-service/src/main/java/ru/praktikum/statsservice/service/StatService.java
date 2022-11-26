@@ -12,6 +12,4 @@ public interface StatService {
     void save(EndpointHitDto endpointHitDto);
 
     List<ViewStatsDto> getEventsStatInfo(String start, String end, List<String> uris, Boolean unique);
-
-    Integer findAllByUri(String uri, String start, String end);
 }

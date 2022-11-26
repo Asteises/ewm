@@ -2,7 +2,12 @@ package ru.praktikum.statsservice.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import ru.praktikum.statsservice.model.dto.EndpointHitDto;
 import ru.praktikum.statsservice.model.dto.ViewStatsDto;
 import ru.praktikum.statsservice.service.StatService;
@@ -45,13 +50,4 @@ public class StatisticController {
         return statService.getEventsStatInfo(start, end, uris, unique);
     }
 
-    @GetMapping("/stats/{eventId}")
-    public Integer getViewsByEventId(@PathVariable long eventId,
-                                     @RequestParam String start,
-                                     @RequestParam String end) {
-
-        Integer integer = statService.findAllByUri("/stats/" + eventId, start, end);
-        log.info("Получаем статистику просмотров для: eventId={}, integer={}", eventId, integer);
-        return integer;
-    }
 }

@@ -3,7 +3,11 @@ package ru.praktikum.mainservice.event.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.lang.Nullable;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import ru.praktikum.mainservice.client.StatClient;
 import ru.praktikum.mainservice.event.model.dto.EventFullDto;
 import ru.praktikum.mainservice.event.model.dto.EventShortDto;
@@ -14,7 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.validation.constraints.Positive;
 import javax.validation.constraints.PositiveOrZero;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
@@ -72,11 +75,7 @@ public class EventPublicController {
                 from,
                 size);
 
-//        for (EventShortDto eventShortDto : result) {
-//            Object o = statClient.getStatsByEventId(eventShortDto.getId());
-//            Integer views = (Integer) o;
-//            eventShortDto.setViews(views);
-//        }
+        log.info("Получаем результат: result={}", result);
         return result;
     }
 
@@ -91,18 +90,14 @@ public class EventPublicController {
     public EventFullDto getPublicEventById(@PathVariable long id,
                                            HttpServletRequest request) {
 
-        log.info("Получаем событие: eventId={}", id);
-
         // Информация для сервиса статистики;
         log.info("client ip: {}", request.getRemoteAddr());
         log.info("endpoint path: {}", request.getRequestURI());
         statClient.saveRequestInfo(request);
 
-//        Integer views = (Integer) statClient.getStatsByEventId(id).getBody();
-
         EventFullDto eventFullDto = eventService.getPublicEventById(id);
-//        eventFullDto.setViews(views);
 
+        log.info("Получаем событие: eventId={}", id);
         return eventFullDto;
     }
 }
