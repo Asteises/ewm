@@ -32,44 +32,34 @@ public class StatClient extends BaseClient {
 
     public void saveRequestInfo(HttpServletRequest httpServletRequest) {
 
+        // Создаем body для запроса и сетим в него данные;
         EndpointHitDto endpointHitDto = new EndpointHitDto();
         endpointHitDto.setApp("main-service");
         endpointHitDto.setUri(httpServletRequest.getRequestURI());
         endpointHitDto.setIp(httpServletRequest.getRemoteAddr());
         endpointHitDto.setTimestamp(LocalDateTime.now().format(EventMapper.FORMATTER_EVENT_DATE));
 
-        ResponseEntity<Object> response = post("/hit", endpointHitDto);
+        // Передаем запрос в сервис статистики;
+        post("/hit", endpointHitDto);
+        log.info("Передаем в сервис статистики: endpointHitDto={}", endpointHitDto);
     }
 
     public ResponseEntity<Object> getStats(LocalDateTime start, LocalDateTime end, List<String> uris, Boolean unique) {
 
+        // Создаем Map для передачи параметров;
         Map<String, Object> parameters = Map.of(
                 "start", start.format(EventMapper.FORMATTER_EVENT_DATE),
                 "end", end.format(EventMapper.FORMATTER_EVENT_DATE),
-                "uris", uris,
+                "uris", uris.get(0),
                 "unique", unique
         );
 
-        log.info("parameters={}", parameters);
+        log.info("Из EventController пришел запрос с параметрами: parameters={}", parameters);
 
+        // Направляем запрос с параметрами в сервис статистики, чтобы вернулся ответ ResponseEntity<Object>;
         ResponseEntity<Object> response = get("/stats?start={start}&end={end}&uris={uris}&unique={unique}", parameters);
-        log.info("response={}", response);
-        return response;
-    }
 
-    public ResponseEntity<Object> getStatsByEventId(long eventId) {
-        String path = "/stats/" + eventId;
-
-        Map<String, Object> parametrs = Map.of(
-                "start", LocalDateTime.MIN,
-                "end", LocalDateTime.now(),
-                "uri", path,
-                "unique", false
-        );
-
-        ResponseEntity<Object> response = get(path, parametrs);
-
-        log.info("Получаем статистику просмотров для eventId={}: response={}", eventId, response.getBody());
+        log.info("Ответ от сервиса статистики: response={}", response);
         return response;
     }
 

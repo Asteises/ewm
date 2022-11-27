@@ -65,7 +65,7 @@ public class StatServiceImpl implements StatService {
         }
 
         // Промежуточный лист EndpointHit для простоты восприятия;
-        List<EndpointHit> endpointHits = new ArrayList<>();
+        List<EndpointHit> endpointHits;
 
         // Проходимся по списку uris, чтобы посчитать просмотры для каждого;
         for (String uri : uris) {

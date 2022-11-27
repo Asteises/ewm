@@ -349,16 +349,11 @@ public class EventServiceImpl implements EventService {
         // Создаем результирующий объект;
         List<EventShortDto> result = new ArrayList<>();
 
-        // Для каждого события сетим просмотры;
+        // Для каждого события сетим просмотры и запросы;
         for (Event event : events) {
 
+            // Используем данный метод для получения просмотров и запросов на событие;
             EventFullDto eventFullDto = getPublicEventById(event.getId());
-
-            // Получаем просмотры;
-            Integer views = getViewsByEventId(eventFullDto.getId());
-
-            // Сетим просмотры;
-            eventFullDto.setViews(views);
 
             // Мапим в EventShortDto и сохраняем в результат;
             result.add(EventMapper.fromFullDtoToShortDto(eventFullDto));
@@ -412,7 +407,7 @@ public class EventServiceImpl implements EventService {
                                            Integer from,
                                            Integer size) {
 
-        // Сначала находим список EventState по указанным параметрам, так как там лежат state;
+        // Сначала находим список событий по указанным параметрам;
         List<Event> events =
                 eventStorage.findEventsByAdminSearch(
                                 users,
@@ -423,15 +418,16 @@ public class EventServiceImpl implements EventService {
                                 PageRequest.of(from / size, size))
                         .stream().toList();
 
-        log.info("Выводим список событий: events.size={}", events.size());
         log.info("Найденные события: events={}", events);
 
-        // Мапим в EventFullDto;
-        List<EventFullDto> result = events.stream().map(EventMapper::fromEventToEventFullDto).toList();
+        // Получаем все id событий;
+        List<Long> eventsIds = events.stream().map(Event::getId).toList();
+        log.info("Найденные ids событий: eventsIds={}", eventsIds);
 
-        // Сетим каждому событию просмотры;
-        result.forEach(eventFullDto -> eventFullDto.setViews(getViewsByEventId(eventFullDto.getId())));
+        // Мапим в EventFullDto, тут же засетим просмотры и запросы;
+        List<EventFullDto> result = eventsIds.stream().map(this::getPublicEventById).toList();
 
+        log.info("Результат: result={}", result);
         return result;
     }
 
@@ -605,6 +601,9 @@ public class EventServiceImpl implements EventService {
         }
     }
 
+    /*
+    Метод передает запрос в сервис статистики и возвращает количество просмотров события;
+     */
     private Integer getViewsByEventId(long eventId) {
 
         // Нужны переменные времени для передачи в сервис статистики;
@@ -616,7 +615,7 @@ public class EventServiceImpl implements EventService {
 
         // Записываем то, что пришло в ответе по отправленным параметрам;
         ResponseEntity<Object> response = statClient.getStats(start, end, uris, false);
-        log.info("Отправляем параметры: start={}, end={}, uris={}, unique={}", start, end, uris, false);
+        log.info("Отправляем в клиент параметры: start={}, end={}, uris={}, unique={}", start, end, uris, false);
 
         if (response != null) {
             // Создаем объект из ответа;
