@@ -2,6 +2,7 @@ package ru.praktikum.mainservice.client;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
@@ -19,12 +20,11 @@ import java.util.Map;
 @Component
 public class StatClient extends BaseClient {
 
-    //@Value("${ewm-stats-service.url}") String url,
     @Autowired
-    public StatClient(RestTemplateBuilder builder) {
+    public StatClient(@Value("${ewm-stats-service.url}") String url, RestTemplateBuilder builder) {
         super(
                 builder
-                        .uriTemplateHandler(new DefaultUriBuilderFactory("http://localhost:9090"))
+                        .uriTemplateHandler(new DefaultUriBuilderFactory(url))
                         .requestFactory(HttpComponentsClientHttpRequestFactory::new)
                         .build()
         );
